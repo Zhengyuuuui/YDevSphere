@@ -1,0 +1,283 @@
+Figma Design Prompt — YDevSphere Dashboard v1
+
+Design and redesign only the /dashboard page of YDevSphere, a local-first desktop developer workspace intelligence application.
+
+Do not redesign, modify, or create any other pages. Do not redesign the existing Projects, Project Detail, Settings, or Welcome pages. The goal of this task is specifically to transform the current project-list dashboard into a true developer workspace overview dashboard, while keeping the visual language consistent with the existing application.
+
+Product Character
+
+YDevSphere is a serious desktop developer tool that helps developers understand and manage the projects stored on their local computer.
+
+The Dashboard should feel like:
+
+A calm command center for my personal software universe.
+
+Visual references: Linear, Raycast, Apple desktop applications, VS Code, GitHub Desktop, Vercel.
+
+Avoid the appearance of:
+
+SaaS admin dashboards
+Consumer AI products
+Marketing websites
+Cyberpunk / futuristic interfaces
+Excessive gradients
+Glassmorphism
+Neon colors
+3D effects
+Decorative AI elements
+Robot, brain, sparkle, magic-wand icons
+Excessive animation
+
+Prioritize clarity, hierarchy, density, precision, and long-term daily usability.
+
+Overall Layout
+
+Create a desktop application window approximately 1440 × 900 px.
+
+Use a fixed left sidebar approximately 220–240 px wide, separated from the main content with a subtle 1px border.
+
+The main content should occupy the remaining width and use a comfortable desktop content width with approximately 40–56 px horizontal padding.
+
+Sidebar
+
+Keep the sidebar minimal and professional.
+
+Top:
+
+[Y placeholder] YDevSphere
+
+The logo is NOT the final YDevSphere logo. Use only a simple black geometric “Y” placeholder icon, approximately 24 × 24 px. It must be visually simple and designed so a future agent can easily replace it with the official logo.
+
+Navigation:
+
+MAIN
+
+
+Dashboard
+Projects
+Recent
+
+
+WORKSPACE
+
+
+Desktop
+127 projects
+
+Bottom:
+
+Settings
+
+Use familiar thin-line desktop application icons.
+
+The active Dashboard item should use a subtle pale blue selection background and blue accent, rather than a heavy solid blue block.
+
+Sidebar should remain visually quiet so the main Dashboard content has the strongest hierarchy.
+
+Main Dashboard
+
+The Dashboard should NOT look like a project table.
+
+It should immediately communicate the overall state of the user's development workspace.
+
+Header
+
+At the top of the main content:
+
+Good afternoon, 小喻
+
+
+Here's what's happening across your workspace.
+
+Use a strong but restrained heading around 28–32 px.
+
+The supporting text should be smaller and muted.
+
+Do not make the greeting overly decorative.
+
+Workspace Statistics
+
+Directly below the header, create a compact horizontal statistics section:
+
+127
+Projects
+
+
+42
+Repositories
+
+
+18
+Active
+
+Use large but restrained numbers and small descriptive labels.
+
+These should feel like useful workspace information rather than KPI cards from a business analytics dashboard.
+
+Avoid colorful card backgrounds.
+
+Prefer a clean layout with subtle separators or generous spacing.
+
+Workspace Activity
+
+Create the primary visualization section beneath the statistics.
+
+Section title:
+
+Workspace Activity
+
+Use a clean ECharts-style line/area chart showing project activity over the last 7 days.
+
+Example axis labels:
+
+Mon   Tue   Wed   Thu   Fri   Sat   Sun
+
+The chart should represent meaningful developer workspace activity, such as project updates/scans/Git activity.
+
+The visualization should be:
+
+minimal
+precise
+lightweight
+easy to read
+low saturation
+professional
+
+Use the existing YDevSphere blue as the primary accent.
+
+Do not use rainbow charts or multiple bright colors.
+
+Avoid excessive grid lines.
+
+The chart should feel integrated into a developer application rather than an analytics SaaS product.
+
+Technology Stack
+
+Place a Technology Stack visualization beside Workspace Activity.
+
+Use a compact horizontal bar visualization or ranked list:
+
+JavaScript      38
+TypeScript      27
+Rust            14
+Python           9
+
+Show each technology with a subtle horizontal bar and count.
+
+Technology colors can use restrained low-saturation badge colors consistent with the existing project technology badges.
+
+Do not use a large pie chart.
+
+Do not make this section visually louder than Workspace Activity.
+
+Recent Projects
+
+Below the visualization section, create:
+
+Recent Projects                         View all →
+
+This is the main visual bridge between the Dashboard and the user's actual projects.
+
+Show approximately 4 recent project items/cards.
+
+Example:
+
+YDevSphere       Rust · Vue · Tauri              12m
+NewAPI           Go · SQLite · Docker              1h
+Yunex Tools      Vue · TypeScript                  3h
+LifeKline        React · PostgreSQL                1d
+
+Prefer compact but visually meaningful project cards rather than a dense database table.
+
+Each project item should communicate:
+
+project name
+technology stack
+recent activity/update time
+subtle project icon or folder icon
+optional Git status indicator
+
+Cards should have subtle borders, very light backgrounds, small radius, and restrained hover states.
+
+Do not use oversized cards.
+
+Do not add unnecessary illustrations.
+
+View all → should be a subtle text action aligned to the right.
+
+Visual System
+
+Maintain visual consistency with the existing YDevSphere application:
+
+white / very light neutral background
+subtle gray borders
+blue primary accent
+low-saturation technology colors
+dark neutral typography
+muted secondary text
+small corner radii
+restrained shadows
+no gradients
+no glass effects
+
+Typography should feel similar to Apple system UI / Inter / SF Pro.
+
+Suggested hierarchy:
+
+Dashboard heading: 28–32 px
+Section headings: 15–17 px semibold
+Statistics numbers: 24–30 px
+Body text: 13–15 px
+Secondary metadata: 12–13 px
+
+Use an 8 px spacing system and maintain generous whitespace without making the dashboard feel empty.
+
+Interaction Principles
+
+Dashboard should feel like a native desktop developer application.
+
+Interactions should be subtle:
+
+Sidebar navigation hover
+Dashboard active state
+Project card hover
+View all → hover
+Chart tooltip on hover
+Technology row hover
+Scan/status interactions can be visually represented but should remain secondary
+
+Avoid animated gradients, floating elements, bouncing cards, excessive transitions, or AI-style visual effects.
+
+Final Composition
+
+The final page should communicate this hierarchy:
+
+Sidebar
+│
+├── Dashboard
+├── Projects
+├── Recent
+│
+├── Workspace
+│   └── Desktop
+│
+└── Settings
+
+
+Main
+│
+├── Greeting
+│
+├── Workspace Statistics
+│
+├── Workspace Activity + Technology Stack
+│
+└── Recent Projects
+
+The overall result should feel like a mature developer desktop application, not a startup landing page and not an analytics admin panel.
+
+The most important design goal is:
+
+When a developer opens YDevSphere, they should immediately understand the current state of their personal software workspace.
+
+Keep the design restrained, information-rich, elegant, and highly usable for everyday desktop use.

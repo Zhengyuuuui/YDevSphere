@@ -1,0 +1,10 @@
+{
+  "description": "Create and customize engaging frontends for web applications effortlessly, empowering developers and designers to enhance user experiences.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
