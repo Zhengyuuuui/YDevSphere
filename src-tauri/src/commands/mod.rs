@@ -10,11 +10,12 @@ pub mod project;
 pub mod workspace;
 
 pub use editor::{
-    get_editor_preference, get_ignore_rules, get_language_preference,
-    get_workspace_preference, get_workspaces, list_editors, open_in_editor,
-    open_in_file_manager, rescan_editors, scan_editors_once, set_editor_preference,
-    set_ignore_rules, set_language_preference, set_workspace_preference,
-    set_workspaces,
+    confirm_custom_editor, get_editor_preference, get_ignore_rules,
+    get_language_preference, get_workspace_preference, get_workspaces,
+    import_custom_app, list_app_candidates, list_editors, list_installed_apps,
+    open_in_editor, open_in_file_manager, rescan_editors, scan_editors_once,
+    set_editor_preference, set_ignore_rules, set_language_preference,
+    set_workspace_preference, set_workspaces,
 };
 pub use git::get_project_git_info;
 pub use memory::{

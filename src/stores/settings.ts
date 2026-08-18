@@ -5,6 +5,8 @@ import {
   ApiError,
 } from "@/api/project";
 import { getWorkspaces, setWorkspaces as persistWorkspaces } from "@/api/workspaces";
+import { resetAppState } from "@/api/settings";
+import { useEditorStore } from "@/stores/editor";
 
 /**
  * 旧 localStorage 键（仅用于过渡期读取兜底）。
@@ -153,6 +155,27 @@ export const useSettingsStore = defineStore("settings", () => {
     await persistAll();
   }
 
+  /**
+   * 登出：重置本地状态（清空 settings.json 全部工作区 / 编辑器 / 偏好 / 缓存，保留数据库），
+   * 并同步清空前端内存态（settings + editor store），避免残留。
+   * 返回是否成功；失败时由调用方展示错误。
+   */
+  async function logout(): Promise<boolean> {
+    error.value = null;
+    try {
+      await resetAppState();
+      // 后端已清空 settings.json，同步清内存态避免残留
+      workspaces.value = [];
+      selecting.value = false;
+      restoring.value = false;
+      useEditorStore().reset();
+      return true;
+    } catch (e) {
+      error.value = e instanceof ApiError ? e.message : String(e);
+      return false;
+    }
+  }
+
   /** 兼容：把 path 设为集合中唯一工作区 */
   function setWorkspace(path: string) {
     void setWorkspaces([path]);
@@ -170,6 +193,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setWorkspaces,
     selectWorkspacePath,
     invalidateWorkspace,
+    logout,
     setWorkspace,
   };
 });

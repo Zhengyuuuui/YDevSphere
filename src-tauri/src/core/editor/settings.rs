@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::core::database::connection::app_data_dir;
-use crate::core::models::AvailableEditor;
+use crate::core::models::{AvailableEditor, InstalledAppInfo};
 
 use super::detect::is_available_editor;
 
@@ -27,6 +27,13 @@ fn settings_path() -> PathBuf {
     }
     app_data_dir().join("settings.json")
 }
+
+/// 当前编辑器识别逻辑版本（v0.3 缓存失效版本化）。
+///
+/// 每次修改识别逻辑（如收紧扩展名清单、强化判定信号）时应 `+1`：
+/// `editor_cache` 记录的版本与它不匹配 → 缓存失效，清缓存重扫。
+/// 本次从 0 → 1（收紧 CODE_FILE_EXTENSIONS + ≥2 扩展名 / Editor 角色判定）。
+pub const EDITOR_LOGIC_VERSION: i32 = 1;
 
 /// 应用本地设置结构。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -62,6 +69,35 @@ pub struct AppSettings {
     /// 无此字段时回退 `None`（向后兼容）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor_cache: Option<Vec<AvailableEditor>>,
+    /// 用户手动确认导入的自定义编辑器（v0.3 V02-EDITOR-FIX 误判治理）。
+    ///
+    /// 用户在「手动候选列表」中确认导入的非 Fork 编辑器写入此集合；
+    /// `list_editors` / `list_app_candidates` 返回时与自动检测结果合并。
+    /// 旧 settings.json 无此字段时回退空列表（`#[serde(default)]`）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom_editors: Vec<AvailableEditor>,
+    /// 应用目录快照（v0.3 启动快照重扫）。
+    ///
+    /// 只存 `/Applications` + `~/Applications` 下的 `.app` 包名（去重排序后字符串列表），
+    /// 用于启动时比对磁盘变化、判断是否需重扫编辑器。不写数据库、不常驻内存。
+    /// 旧 settings.json 无此字段时回退空列表（`#[serde(default)]`）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub app_snapshot: Vec<String>,
+    /// 编辑器识别逻辑版本（v0.3 缓存失效版本化）。
+    ///
+    /// 记录生成 `editor_cache` 时的识别逻辑版本；与 `EDITOR_LOGIC_VERSION`
+    /// 不匹配时缓存视为失效（旧逻辑产物，如误判 Safari），需清缓存重扫。
+    /// 旧 settings.json 无此字段时回退 0（`#[serde(default)]`），与当前版本
+    /// 不匹配即触发失效重扫。
+    #[serde(default)]
+    pub editor_cache_version: i32,
+    /// 已安装应用列表缓存（V03-INSTALLED-APPS-CACHE）。
+    ///
+    /// 存 `list_installed_apps` 算好的结果（含 icon_base64）。`app_snapshot`
+    /// 未变化（未装/卸 .app）时直接复用，避免每次遍历 + 取 icon 的昂贵开销。
+    /// 旧 settings.json 无此字段时回退 `None`（触发首次计算）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_apps_cache: Option<Vec<InstalledAppInfo>>,
 }
 
 /// 设置操作错误。
@@ -111,6 +147,22 @@ fn write_settings(settings: &AppSettings) -> Result<(), SettingsError> {
         .map_err(|e| SettingsError::Io(std::io::Error::other(e)))?;
     std::fs::write(&path, json).map_err(SettingsError::Io)?;
     Ok(())
+}
+
+/// 一次性重置本地应用状态（V03-RESET-BACKEND）。
+///
+/// 将 `settings.json` 重置为 `AppSettings::default()` 并写回，清空全部字段：
+/// `custom_editors` / `workspaces` / `workspace_path` / `default_editor` /
+/// `editor_cache` / `editor_cache_version` / `installed_apps_cache` /
+/// `ignore_dirs` / `language`（及 `app_snapshot`），回到全新状态。
+///
+/// ## 保留数据库（方案 A）
+/// 只清 settings，**不删** projects / scan_history 表——项目索引保留，
+/// 用户重新导入工作区后扫描自动 upsert + 清理 missing 对齐。
+///
+/// 写失败（目录不可写等）返回 `Err`，不部分写入。
+pub fn reset_settings() -> Result<(), SettingsError> {
+    write_settings(&AppSettings::default())
 }
 
 /// 读取默认编辑器 id；未设置 / 文件不存在返回 `Ok(None)`。
@@ -246,6 +298,66 @@ pub fn clear_editor_cache() -> Result<(), SettingsError> {
     write_settings(&settings)
 }
 
+/// 读取缓存记录的识别逻辑版本；未记录回退 0（视为旧缓存，触发失效重扫）。
+pub fn get_editor_cache_version() -> Result<i32, SettingsError> {
+    Ok(read_settings()?.editor_cache_version)
+}
+
+/// 写入当前识别逻辑版本到缓存记录（读改写，保留其他字段）。
+pub fn set_editor_cache_version(version: i32) -> Result<(), SettingsError> {
+    let mut settings = read_settings()?;
+    settings.editor_cache_version = version;
+    write_settings(&settings)
+}
+
+/// 读取用户手动确认导入的自定义编辑器；未设置返回空列表。
+pub fn get_custom_editors() -> Result<Vec<AvailableEditor>, SettingsError> {
+    Ok(read_settings()?.custom_editors)
+}
+
+/// 设置自定义编辑器列表（整表替换；读改写保留其他字段）。
+///
+/// `custom_editors` 是用户手动确认导入的编辑器权威源。
+pub fn set_custom_editors(editors: Vec<AvailableEditor>) -> Result<(), SettingsError> {
+    let mut settings = read_settings()?;
+    settings.custom_editors = editors;
+    write_settings(&settings)
+}
+
+/// 判断某 id 是否为已确认导入的自定义编辑器。
+pub fn is_custom_editor(editor_id: &str) -> Result<bool, SettingsError> {
+    Ok(read_settings()?
+        .custom_editors
+        .iter()
+        .any(|e| e.id == editor_id))
+}
+
+/// 读取上次启动的应用目录快照（`.app` 包名列表）；无快照返回空列表。
+pub fn get_app_snapshot() -> Result<Vec<String>, SettingsError> {
+    Ok(read_settings()?.app_snapshot)
+}
+
+/// 写入应用目录快照（读改写，保留其他字段）。
+pub fn set_app_snapshot(snapshot: Vec<String>) -> Result<(), SettingsError> {
+    let mut settings = read_settings()?;
+    settings.app_snapshot = snapshot;
+    write_settings(&settings)
+}
+
+/// 读取已安装应用列表缓存；无缓存返回 `Ok(None)`。
+pub fn get_installed_apps_cache() -> Result<Option<Vec<InstalledAppInfo>>, SettingsError> {
+    Ok(read_settings()?.installed_apps_cache)
+}
+
+/// 写入已安装应用列表缓存（读改写，保留其他字段）。
+pub fn set_installed_apps_cache(
+    cache: Vec<InstalledAppInfo>,
+) -> Result<(), SettingsError> {
+    let mut settings = read_settings()?;
+    settings.installed_apps_cache = Some(cache);
+    write_settings(&settings)
+}
+
 /// 清洗路径/目录列表：去空白项 + 去前后空格 + 去重（保持首次出现顺序）。
 fn clean_dirs(dirs: &[String]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
@@ -269,7 +381,8 @@ mod tests {
 
     static COUNTER: AtomicUsize = AtomicUsize::new(0);
     /// 串行化：env var 是进程级状态，避免并行测试互相覆盖。
-    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// 复用 editor 模块共享锁，与 commands 层测试互斥（防 env 竞态）。
+    use super::super::TEST_ENV_LOCK as LOCK;
 
     /// 每个测试使用独立的临时设置文件路径，避免相互污染。
     fn test_settings_path() -> PathBuf {
@@ -699,6 +812,352 @@ mod tests {
             get_language_preference().expect("读取应成功").as_deref(),
             Some("zh-CN")
         );
+        teardown(&path);
+    }
+
+    // ---- v0.3：自定义编辑器（V02-EDITOR-FIX 误判治理） ----
+
+    fn custom_editor(id: &str, name: &str) -> AvailableEditor {
+        AvailableEditor {
+            id: id.to_string(),
+            name: name.to_string(),
+            cli_command: None,
+            app_path: Some(format!("/Applications/{name}.app")),
+            icon_base64: None,
+            open_method: crate::core::models::OpenMethod::OpenA,
+            source: crate::core::models::EditorSource::Discovered,
+            category: crate::core::models::EditorCategory::AiEditor,
+        }
+    }
+
+    #[test]
+    fn custom_editors_default_empty() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+        assert_eq!(get_custom_editors().expect("读取应成功"), Vec::<AvailableEditor>::new());
+        assert!(!is_custom_editor("x").expect("读取应成功"));
+        teardown(&path);
+    }
+
+    #[test]
+    fn custom_editors_roundtrip_and_is_custom() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_custom_editors(vec![
+            custom_editor("com.example.codex", "Codex"),
+            custom_editor("com.example.claude", "Claude"),
+        ])
+        .expect("写入应成功");
+
+        let list = get_custom_editors().expect("读取应成功");
+        assert_eq!(list.len(), 2);
+        assert!(is_custom_editor("com.example.codex").expect("读取应成功"));
+        assert!(is_custom_editor("com.example.claude").expect("读取应成功"));
+        assert!(!is_custom_editor("com.example.other").expect("读取应成功"));
+
+        // 整表替换
+        set_custom_editors(vec![custom_editor("com.example.new", "New")]).expect("替换应成功");
+        let list2 = get_custom_editors().expect("读取应成功");
+        assert_eq!(list2.len(), 1);
+        assert_eq!(list2[0].id, "com.example.new");
+        teardown(&path);
+    }
+
+    #[test]
+    fn custom_editors_does_not_overwrite_other_settings() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_editor_preference("vscode").expect("设置编辑器应成功");
+        set_language_preference("zh-CN").expect("设置语言应成功");
+
+        // 写 custom_editors
+        set_custom_editors(vec![custom_editor("com.example.codex", "Codex")]).expect("写入应成功");
+
+        // 其他字段保留
+        assert_eq!(
+            get_editor_preference().expect("读取应成功").as_deref(),
+            Some("vscode")
+        );
+        assert_eq!(
+            get_language_preference().expect("读取应成功").as_deref(),
+            Some("zh-CN")
+        );
+        assert_eq!(get_custom_editors().expect("读取应成功").len(), 1);
+        teardown(&path);
+    }
+
+    // ---- v0.3：应用目录快照（启动快照重扫） ----
+
+    #[test]
+    fn app_snapshot_default_empty() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+        assert_eq!(get_app_snapshot().expect("读取应成功"), Vec::<String>::new());
+        teardown(&path);
+    }
+
+    #[test]
+    fn app_snapshot_roundtrip() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_app_snapshot(vec![
+            "Cursor".to_string(),
+            "Visual Studio Code".to_string(),
+            "Codex".to_string(),
+        ])
+        .expect("写入应成功");
+        assert_eq!(
+            get_app_snapshot().expect("读取应成功"),
+            vec![
+                "Cursor".to_string(),
+                "Visual Studio Code".to_string(),
+                "Codex".to_string()
+            ]
+        );
+
+        // 覆盖（磁盘变化后重扫更新快照）
+        set_app_snapshot(vec!["Cursor".to_string()]).expect("覆盖应成功");
+        assert_eq!(get_app_snapshot().expect("读取应成功"), vec!["Cursor".to_string()]);
+        teardown(&path);
+    }
+
+    #[test]
+    fn app_snapshot_does_not_overwrite_other_settings() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_language_preference("en-US").expect("设置语言应成功");
+        set_custom_editors(vec![custom_editor("com.example.codex", "Codex")]).expect("写入应成功");
+
+        // 写快照，不应覆盖其他字段
+        set_app_snapshot(vec!["Cursor".to_string()]).expect("写入快照应成功");
+
+        assert_eq!(
+            get_language_preference().expect("读取应成功").as_deref(),
+            Some("en-US")
+        );
+        assert_eq!(get_custom_editors().expect("读取应成功").len(), 1);
+        assert_eq!(get_app_snapshot().expect("读取应成功"), vec!["Cursor".to_string()]);
+        teardown(&path);
+    }
+
+    // ---- v0.3 主修 B：custom_editors 作为已知编辑器独立权威源 ----
+
+    /// 已确认的 custom 项在「系统卸载后」（自动检测不再返回）仍可设默认，
+    /// 不会报「未知编辑器」。
+    #[test]
+    fn confirmed_custom_is_available_even_when_uninstalled() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        // 用户已确认导入一个虚构编辑器（其 app 已从 /Applications 卸载，
+        // 自动检测不会返回它——用一个绝对不存在的 id 模拟）。
+        let confirmed_id = "com.example.uninstalled-editor";
+        set_custom_editors(vec![custom_editor(confirmed_id, "Uninstalled")])
+            .expect("写入 custom_editors 应成功");
+
+        // is_available_editor：custom 兜底生效 → 即使自动检测找不到也算可用。
+        assert!(
+            crate::core::editor::detect::is_available_editor(confirmed_id),
+            "已确认 custom 项即使系统卸载也应可设默认"
+        );
+
+        // find_editor_by_id：同样能从 custom_editors 找回。
+        assert!(
+            crate::core::editor::detect::find_editor_by_id(confirmed_id).is_some(),
+            "已确认 custom 项应能被按 id 找回"
+        );
+        teardown(&path);
+    }
+
+    /// 已确认项重复确认：幂等成功（不重复追加、不报错），
+    /// 即使系统已卸载该 app（自动检测找不到）。
+    #[test]
+    fn confirm_custom_editor_is_idempotent_for_confirmed() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        let confirmed_id = "com.example.uninstalled-editor";
+        set_custom_editors(vec![custom_editor(confirmed_id, "Uninstalled")])
+            .expect("写入 custom_editors 应成功");
+
+        // 重复确认 → Ok（幂等），不依赖 find_editor_by_id（该 id 不在自动检测）。
+        crate::commands::editor::confirm_custom_editor(confirmed_id.to_string())
+            .expect("已确认项重复确认应幂等成功");
+
+        // custom_editors 不重复追加。
+        assert_eq!(get_custom_editors().expect("读取应成功").len(), 1);
+        teardown(&path);
+    }
+
+    // ---- v0.3：缓存失效版本化（识别逻辑版本） ----
+
+    #[test]
+    fn editor_cache_version_default_zero() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+        assert_eq!(get_editor_cache_version().expect("读取应成功"), 0);
+        teardown(&path);
+    }
+
+    #[test]
+    fn editor_cache_version_roundtrip() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_editor_cache_version(EDITOR_LOGIC_VERSION).expect("写入应成功");
+        assert_eq!(
+            get_editor_cache_version().expect("读取应成功"),
+            EDITOR_LOGIC_VERSION
+        );
+
+        // 覆盖（识别逻辑再更新时 +1）
+        set_editor_cache_version(EDITOR_LOGIC_VERSION + 1).expect("写入应成功");
+        assert_eq!(
+            get_editor_cache_version().expect("读取应成功"),
+            EDITOR_LOGIC_VERSION + 1
+        );
+        teardown(&path);
+    }
+
+    #[test]
+    fn editor_cache_version_does_not_overwrite_other_settings() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        set_language_preference("en-US").expect("设置语言应成功");
+        set_app_snapshot(vec!["Cursor".to_string()]).expect("写入快照应成功");
+
+        set_editor_cache_version(EDITOR_LOGIC_VERSION).expect("写入版本应成功");
+
+        assert_eq!(
+            get_language_preference().expect("读取应成功").as_deref(),
+            Some("en-US")
+        );
+        assert_eq!(get_app_snapshot().expect("读取应成功"), vec!["Cursor".to_string()]);
+        assert_eq!(
+            get_editor_cache_version().expect("读取应成功"),
+            EDITOR_LOGIC_VERSION
+        );
+        teardown(&path);
+    }
+
+    // ---- V03-RESET-BACKEND：重置应用状态 ----
+
+    /// reset_settings：清空全部字段回到默认态。
+    #[test]
+    fn reset_clears_all_fields() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        // 先写入各类非默认值。
+        set_editor_preference("vscode").expect("写入编辑器应成功");
+        set_workspace_preference("/tmp/ws").expect("写入工作区应成功");
+        set_workspaces(&["/tmp/ws".to_string(), "/tmp/ws2".to_string()]).expect("写入集合应成功");
+        set_ignore_dirs(&["cache".to_string()]).expect("写入忽略规则应成功");
+        set_language_preference("zh-CN").expect("写入语言应成功");
+        set_custom_editors(vec![custom_editor("com.example.codex", "Codex")])
+            .expect("写入 custom 应成功");
+        set_editor_cache_version(EDITOR_LOGIC_VERSION).expect("写入版本应成功");
+        set_app_snapshot(vec!["Cursor".to_string()]).expect("写入快照应成功");
+
+        // reset → 回到默认态。
+        reset_settings().expect("reset 应成功");
+
+        assert_eq!(get_editor_preference().expect("读取应成功"), None, "default_editor 清空");
+        assert_eq!(get_workspace_preference().expect("读取应成功"), None, "workspace_path 清空");
+        assert_eq!(get_workspaces().expect("读取应成功"), Vec::<String>::new(), "workspaces 清空");
+        assert_eq!(get_ignore_dirs().expect("读取应成功"), Vec::<String>::new(), "ignore_dirs 清空");
+        assert_eq!(get_language_preference().expect("读取应成功"), None, "language 清空");
+        assert_eq!(get_custom_editors().expect("读取应成功"), Vec::<AvailableEditor>::new(), "custom_editors 清空");
+        assert_eq!(get_editor_cache().expect("读取应成功"), None, "editor_cache 清空");
+        assert_eq!(get_editor_cache_version().expect("读取应成功"), 0, "editor_cache_version 归零");
+        assert_eq!(get_installed_apps_cache().expect("读取应成功"), None, "installed_apps_cache 清空");
+        assert_eq!(get_app_snapshot().expect("读取应成功"), Vec::<String>::new(), "app_snapshot 清空");
+
+        teardown(&path);
+    }
+
+    /// reset_settings：幂等——连续 reset 多次结果一致，不报错。
+    #[test]
+    fn reset_is_idempotent() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+
+        // 写入非默认值后再 reset。
+        set_editor_preference("cursor").expect("写入应成功");
+        set_workspaces(&["/tmp/a".to_string()]).expect("写入应成功");
+        set_language_preference("en-US").expect("写入应成功");
+
+        // 连续两次 reset → 都成功，状态仍为默认。
+        reset_settings().expect("第一次 reset 应成功");
+        reset_settings().expect("第二次 reset 应成功");
+
+        assert_eq!(get_editor_preference().expect("读取应成功"), None);
+        assert_eq!(get_workspaces().expect("读取应成功"), Vec::<String>::new());
+        assert_eq!(get_language_preference().expect("读取应成功"), None);
+
+        teardown(&path);
+    }
+
+    /// reset_settings：文件不存在（全新安装）时也能安全 reset（写成默认态）。
+    #[test]
+    fn reset_works_when_file_missing() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+        // setup 已清空文件 → 等价「文件不存在」。
+        reset_settings().expect("reset 应成功");
+        assert_eq!(get_editor_preference().expect("读取应成功"), None);
+        assert_eq!(get_workspaces().expect("读取应成功"), Vec::<String>::new());
+        teardown(&path);
+    }
+
+    // ---- v0.3：手动导入幂等写（V03-MANUAL-IMPORT-BACKEND） ----
+
+    /// 构造临时 .app（含 product.json，可被识别为 Fork），返回路径。
+    fn temp_fork_app() -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let tmp = std::env::temp_dir().join(format!(
+            "ydevsphere_import_{}_{}",
+            std::process::id(),
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let app = tmp.join("MyFork.app");
+        std::fs::create_dir_all(app.join("Contents/Resources/app")).unwrap();
+        std::fs::write(
+            app.join("Contents/Resources/app/product.json"),
+            r#"{"nameShort":"MyFork","applicationName":"myfork","dataFolderName":".myfork"}"#,
+        )
+        .unwrap();
+        app
+    }
+
+    /// import_and_persist_custom_app：幂等写——同 id 二次导入不重复追加。
+    #[test]
+    fn import_custom_app_is_idempotent_in_custom_editors() {
+        let _guard = LOCK.lock().unwrap();
+        let path = setup();
+        let app = temp_fork_app();
+
+        // 首次导入 → 写入 custom_editors（1 项）。
+        let first = crate::core::editor::discover::import_and_persist_custom_app(&app)
+            .expect("首次导入应成功");
+        assert_eq!(first.id, "myfork");
+        assert_eq!(get_custom_editors().expect("读取应成功").len(), 1);
+
+        // 二次导入同 app → 幂等返回已有项，不重复追加。
+        let second = crate::core::editor::discover::import_and_persist_custom_app(&app)
+            .expect("二次导入应成功");
+        assert_eq!(second.id, "myfork");
+        assert_eq!(get_custom_editors().expect("读取应成功").len(), 1, "幂等，不重复追加");
+
+        let _ = std::fs::remove_dir_all(app.parent().unwrap());
         teardown(&path);
     }
 }

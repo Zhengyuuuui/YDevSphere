@@ -45,6 +45,11 @@
 - **改动**：`impl std::error::Error for ScanCommandError {}`。
 - **建议**：可顺手在下次后端改动时一并补。
 
+### P3-9 `loadEditors` 并发竞态（from V03-SELECT-MISSING 排查）
+- **状态**：待做（可选）
+- **背景**：排查「下拉框不显示手动导入」时发现，`stores/editor.ts` 的 `loadEditors()` 无请求序号/防抖。Settings 手动导入路径（`importApp`）与 `init()` 若同时触发两个 `loadEditors`，后发起者若延迟 resolve，可能被先发起的旧结果覆盖，导致手动导入项偶发不显示。
+- **建议**：`loadEditors` 内加请求序号/防抖，或改为「最后发起的请求结果为准」。属次要，当前 `confirmCustom` 补 `loadEditors` 已覆盖主路径，可择机做。
+
 ---
 
 ## 三、历史遗留（早期记录，仍有效）

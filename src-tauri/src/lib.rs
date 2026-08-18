@@ -59,6 +59,10 @@ pub fn run() {
             commands::git::get_project_git_info,
             commands::editor::list_editors,
             commands::editor::rescan_editors,
+            commands::editor::list_app_candidates,
+            commands::editor::confirm_custom_editor,
+            commands::editor::list_installed_apps,
+            commands::editor::import_custom_app,
             commands::editor::open_in_editor,
             commands::editor::open_in_file_manager,
             commands::editor::get_editor_preference,
@@ -71,6 +75,7 @@ pub fn run() {
             commands::editor::set_workspaces,
             commands::editor::get_language_preference,
             commands::editor::set_language_preference,
+            commands::editor::reset_app_state,
             commands::workspace::get_system_workspaces,
         ])
         .run(tauri::generate_context!())

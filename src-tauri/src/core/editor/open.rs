@@ -54,7 +54,29 @@ pub fn open_editor_via(editor: &AvailableEditor, project_path: &Path) -> Result<
             let Some(cli) = &editor.cli_command else {
                 return Err(EditorError::NotFound(editor.id.clone()));
             };
-            let mut cmd = std::process::Command::new(cli);
+
+            // 解析要执行的命令，解决「VS Code 点开报错」：
+            // 白名单项的 `cli_command` 是纯命令名（如 `code`），`app_path` 才是
+            // `resolve_editor_command` 解析出的真实可执行路径。若 PATH 无 `code`
+            //（VS Code 通过绝对路径候选命中、但 CLI 未装进 PATH），`Command::new("code")`
+            // 会 spawn 失败。故优先用可执行文件路径启动，其次命令名。
+            let exec = if Path::new(cli).is_absolute() {
+                // cli_command 已是绝对路径（动态 Fork 回退 app 内 bin）
+                cli.clone()
+            } else if editor
+                .app_path
+                .as_deref()
+                .map(|p| Path::new(p).is_file())
+                .unwrap_or(false)
+            {
+                // app_path 是可执行文件（白名单项存 resolve_editor_command 结果）
+                editor.app_path.as_deref().unwrap().to_string()
+            } else {
+                // 命令名，依赖 PATH（如动态 Fork PATH 命中）
+                cli.clone()
+            };
+
+            let mut cmd = std::process::Command::new(&exec);
             cmd.arg(project_path);
             cmd.spawn().map(|_| ()).map_err(EditorError::Launch)
         }
@@ -97,6 +119,7 @@ mod tests {
             name: id.to_string(),
             cli_command: cli_command.map(String::from),
             app_path: app_path.map(String::from),
+            icon_base64: None,
             open_method,
             source: EditorSource::Discovered,
             category: EditorCategory::Native,
@@ -136,5 +159,45 @@ mod tests {
         assert!(unsupported.to_string().contains("手动选择目录"));
         // unknown 文案应提示「未知编辑器」
         assert!(unknown.to_string().contains("未知编辑器"));
+    }
+
+    /// 根因修复（V03 vs code 打开报错）：白名单项 cli_command 是命令名（如
+    /// `code`）但 PATH 无此命令时，应回退用 app_path（可执行文件路径）启动。
+    ///
+    /// 用临时可执行脚本作为 app_path，cli_command 设为一个不存在的命令名，
+    /// 验证 open_editor_via 选择 app_path 启动（spawn 成功）而非 cli_command。
+    #[cfg(unix)]
+    #[test]
+    fn cli_falls_back_to_app_path_when_command_missing_in_path() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let tmp = std::env::temp_dir().join(format!(
+            "ydevsphere_open_test_{}_{}",
+            std::process::id(),
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        // 临时可执行脚本（模拟 resolve_editor_command 解析出的可执行路径）。
+        let script = tmp.join("fake-code");
+        std::fs::write(&script, "#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // 白名单项：cli_command = 不存在的命令名，app_path = 可执行脚本。
+        let e = editor(
+            "vscode",
+            OpenMethod::Cli,
+            Some("nonexistent-xyz-command"),
+            Some(script.to_str().unwrap()),
+        );
+        // 应通过 app_path（可执行文件）成功 spawn，而非 cli_command（失败）。
+        let result = open_editor_via(&e, Path::new("/tmp"));
+        assert!(result.is_ok(), "应回退用 app_path 启动，实际: {result:?}");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

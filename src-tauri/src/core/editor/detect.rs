@@ -188,7 +188,18 @@ pub fn list_available_editors() -> Vec<AvailableEditor> {
         if is_covered_by_whitelist(&discovered, &whitelist_ids) {
             continue;
         }
+        // 防御性过滤：Unsupported 一律不进列表（v0.3 误判治理，保险）。
+        if discovered.open_method == OpenMethod::Unsupported {
+            continue;
+        }
         out.push(discovered);
+    }
+
+    // 统一填充 256px 大图标（V03-EDITOR-ICON-LARGE）：app_path 指向真实 .app
+    // 的编辑器携带图标，纯 CLI（如 vim/nvim）为 None。动态发现项已在
+    // to_available_editor 填充，白名单项在此定位 .app 后填充；幂等无害。
+    for e in &mut out {
+        discover::fill_editor_icon(e);
     }
 
     out
@@ -209,6 +220,8 @@ fn whitelist_to_editor(def: &EditorDefinition, cmd: &PathBuf) -> AvailableEditor
         name: def.name.to_string(),
         cli_command: def.cli.first().map(|s| s.to_string()),
         app_path: Some(cmd.display().to_string()),
+        // icon 由 list_available_editors 统一按 app_path 定位 .app 后填充。
+        icon_base64: None,
         open_method: OpenMethod::Cli,
         source: EditorSource::Whitelist,
         category,
@@ -239,20 +252,39 @@ pub fn is_known_editor(id: &str) -> bool {
     SUPPORTED_EDITORS.iter().any(|def| def.id == id)
 }
 
-/// 编辑器 id 是否「可用」（白名单 + 动态发现均纳入）。
+/// 编辑器 id 是否「可用」（白名单 + 动态发现 + 已确认 custom_editors 均纳入）。
 ///
 /// 供 `set_editor_preference` 校验使用：动态发现的编辑器（如 Cursor 之外的
-/// Trae/Qoder/ChatGPT 等）也可设为默认编辑器，不再局限于白名单。
+/// Trae/Qoder/ChatGPT 等）以及用户已确认导入的自定义编辑器均可设为默认编辑器。
+///
+/// **主修 B（V03-EDITOR-FIX）**：纳入 `custom_editors` 作为独立权威源——
+/// 即使编辑器已从 /Applications 卸载、自动检测不再返回它，只要它是用户
+/// 已确认过的 custom 项，仍视为「已知」并可设为默认（不会报「未知编辑器」）。
 ///
 /// 注意：本函数会触发一次动态发现（遍历 /Applications），成本较高，
 /// 仅用于低频的「设默认编辑器」校验场景。
 pub fn is_available_editor(id: &str) -> bool {
-    list_available_editors().iter().any(|e| e.id == id)
+    if list_available_editors().iter().any(|e| e.id == id) {
+        return true;
+    }
+    // 兜底：查用户已确认导入的 custom_editors。
+    super::settings::get_custom_editors()
+        .map(|custom| custom.iter().any(|e| e.id == id))
+        .unwrap_or(false)
 }
 
-/// 按 id 在「白名单 + 动态发现」中查找编辑器；未找到返回 `None`。
+/// 按 id 在「白名单 + 动态发现 + 已确认 custom_editors」中查找编辑器；未找到返回 `None`。
+///
+/// 先查自动检测列表，未命中再查 `custom_editors`（主修 B：卸载后仍可识别）。
 pub fn find_editor_by_id(id: &str) -> Option<AvailableEditor> {
-    list_available_editors().into_iter().find(|e| e.id == id)
+    if let Some(editor) = list_available_editors().into_iter().find(|e| e.id == id) {
+        return Some(editor);
+    }
+    // 兜底：查已确认导入的 custom_editors（即使系统已卸载该 app）。
+    super::settings::get_custom_editors()
+        .ok()?
+        .into_iter()
+        .find(|e| e.id == id)
 }
 
 /// 解析某个编辑器为可执行路径；不可用返回 `None`。

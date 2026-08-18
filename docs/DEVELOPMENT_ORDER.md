@@ -1535,3 +1535,59 @@ interface ProjectView {
 - 仅做前端（`src/`），未改动任何 Rust / 后端代码。
 - 现有编辑器打开链路不变（`openEditor` / `openFileManager` 降级逻辑未动）。
 - 现有功能无回归（扫描/筛选/搜索/排序/记忆/Git/打开/最近/设置/启动恢复/编辑器偏好）。
+
+---
+
+## 二十八、v0.3 · 后端编辑器发现误判治理（任务 V02-EDITOR-FIX / V03）
+
+### 28.1 完成度
+
+| 模块 | 状态 | 说明 |
+|---|---|---|
+| `core/models/editor.rs` | ✅ | `EditorCategory` 新增 `AiEditor` 变体（serde 序列化为 `ai_editor`） |
+| `core/editor/discover.rs` | ✅ | 三层识别口径（L1 product.json 指纹 / L2 代码类型自动 / L3 排除） |
+| `core/editor/detect.rs` | ✅ | `list_available_editors` 过滤 unsupported（防御） |
+| `core/editor/settings.rs` | ✅ | `AppSettings` 新增 `custom_editors` + `get_custom_editors` / `set_custom_editors` / `is_custom_editor` |
+| `commands/editor.rs` | ✅ | `scan_and_cache` 读缓存过滤 unsupported（清旧缓存污染）；新增 `list_app_candidates` / `confirm_custom_editor` |
+
+### 28.2 识别口径（用户拍板）
+
+- **L1 可靠自动**：product.json 指纹（VS Code Fork）→ `Cli`，自动进列表。保持不变。
+- **L2 代码类型自动**：无 product.json，但 Info.plist `CFBundleTypeExtensions` 声明了代码文件类型（`CODE_FILE_EXTENSIONS` 清单任一生效，主流语言 + 配置文件扩展名）→ `OpenA`，分类为 `AiEditor`（如 ChatGPT/Codex、Claude），自动进列表。
+- **L3 排除**：仅 `public.folder` 或仅 bundleId、无代码文件类型 → 一律不进列表（不产生 Unsupported，不进自动列表、不进手动候选）。IINA / 浏览器 / 办公软件等被排除。
+
+### 28.3 新增 Command 签名（供前端对接）
+
+| 前端 API | 后端 Command | 入参（Rust → camelCase） | 返回 | 语义 |
+|---|---|---|---|---|
+| `listAppCandidates()` | `list_app_candidates` | 无 | `Promise<AvailableEditor[]>` | 手动候选列表 = 自动检测（L1+L2）+ 已确认 custom_editors，去重合并；仅含可打开（cli/open_a） |
+| `confirmCustomEditor(editorId)` | `confirm_custom_editor` | `editor_id` → `editorId` | `Promise<void>` | 将指定编辑器写入 `custom_editors`（去重）；未知 id 返回「未知编辑器」 |
+
+### 28.4 `EditorCategory::AiEditor` 序列化值
+
+- `AiEditor` → `"ai_editor"`（snake_case，serde 自动）。
+
+### 28.5 `custom_editors` 结构
+
+`AppSettings.custom_editors: Vec<AvailableEditor>`（用户手动确认导入的编辑器权威源），持久化到 `~/.ydevsphere/settings.json`。读写采用「读改写」保留其他字段。
+
+### 28.6 测试结果
+
+```text
+cargo build  ✅ 编译通过（无 warning）
+cargo test   ✅ 127 passed; 0 failed（基线 120 → 新增 7 个）
+  - discover：L2 代码类型 open-a/AiEditor、L3 仅 public.folder 排除、L3 仅 bundleId 排除、代码类型判定（大小写不敏感）
+  - settings：custom_editors 默认空 / roundtrip+is_custom / 不覆盖其他设置
+  - commands：filter_usable 缓存清洗（移除 unsupported / 全 unsupported 为空）
+```
+
+### 28.7 架构约束
+
+- `core/` 无 `use tauri`。
+- `commands/` 只做参数解析 + 转发，不放业务逻辑。
+- 只写 `~/.ydevsphere/` 应用数据；跨平台，无 macOS-only 业务逻辑。
+- 编辑器打开仍经过已知编辑器校验，未知 id 拒绝执行。
+
+---
+
+> **后端已完成，待前端 agent 对接**：新增 `listAppCandidates()` / `confirmCustomEditor(editorId)` 两个 command；`AvailableEditor.category` 新增 `ai_editor` 取值；旧 `list_editors` 返回结构不变但已过滤 unsupported。前端需同步 TS 类型 `EditorCategory` 增加 `"ai_editor"`，并据 `list_app_candidates` 实现 Welcome「选择常用编辑器」引导与 Settings「手动导入自定义编辑器」。

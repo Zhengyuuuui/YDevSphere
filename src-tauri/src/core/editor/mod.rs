@@ -16,15 +16,26 @@ pub mod discover;
 pub mod open;
 pub mod settings;
 
+/// 共享测试锁：串行化所有设置 `YDEVSPHERE_SETTINGS_PATH` env 的测试
+/// （settings 模块内 + commands 层），避免并行测试的 env 竞态。
+#[cfg(test)]
+pub(crate) static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 pub use detect::{
     find_editor_by_id, is_available_editor, is_known_editor,
     list_available_editors, resolve_editor_by_id, EditorError,
 };
+pub use discover::{
+    import_and_persist_custom_app, import_custom_app, list_installed_apps,
+};
 pub use open::{open_editor_by_id, open_editor_via, open_in_editor};
 pub use settings::{
-    clear_editor_cache, get_editor_cache, get_editor_preference, get_ignore_dirs,
-    get_language_preference, get_workspace_preference, get_workspaces,
-    set_editor_cache, set_editor_preference, set_ignore_dirs,
+    clear_editor_cache, get_app_snapshot, get_custom_editors, get_editor_cache,
+    get_editor_cache_version, get_editor_preference, get_ignore_dirs,
+    get_installed_apps_cache, get_language_preference, get_workspace_preference,
+    get_workspaces, is_custom_editor, reset_settings, set_app_snapshot,
+    set_custom_editors, set_editor_cache, set_editor_cache_version,
+    set_editor_preference, set_ignore_dirs, set_installed_apps_cache,
     set_language_preference, set_workspace_preference, set_workspaces,
-    SettingsError,
+    SettingsError, EDITOR_LOGIC_VERSION,
 };

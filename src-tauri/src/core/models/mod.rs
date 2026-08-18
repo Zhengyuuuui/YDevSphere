@@ -12,7 +12,9 @@ pub mod memory;
 pub mod project;
 pub mod workspace;
 
-pub use editor::{AvailableEditor, EditorCategory, EditorSource, OpenMethod};
+pub use editor::{
+    AvailableEditor, EditorCategory, EditorSource, InstalledAppInfo, OpenMethod,
+};
 pub use error::ScanCommandError;
 pub use git::{CommitInfo, GitInfo, GitStatus};
 pub use memory::{ProjectMemory, ProjectRef};
