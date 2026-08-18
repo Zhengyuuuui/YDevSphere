@@ -274,7 +274,7 @@ Scanner 稳定后再做文件监听 / 增量更新，避免在边界语义未稳
 
 ### 待 GUI 实测的 P2 项
 
-见 `docs/BACKLOG-P2P3.md`：
+见 `docs/ROADMAP.md`：
 
 - 无效目录触发 `INVALID_DIRECTORY` 的 Tauri → 前端错误链路
 - 旧 localStorage 工作区迁移到后端后，清理 localStorage 并重启恢复
