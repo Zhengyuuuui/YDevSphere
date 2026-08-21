@@ -48,27 +48,27 @@ function handleSkip() {
     v-if="open"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
   >
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h3 class="text-lg font-semibold text-gray-900">{{ t("memoryDialog.title") }}</h3>
-      <p class="mt-2 text-sm text-gray-600">
+    <div class="w-full max-w-md rounded-lg bg-surface p-6 shadow-xl">
+      <h3 class="text-lg font-semibold text-ink">{{ t("memoryDialog.title") }}</h3>
+      <p class="mt-2 text-sm text-muted">
         {{ t("memoryDialog.body", { count: projects.length }) }}
-        <code class="rounded bg-gray-100 px-1 py-0.5 text-xs">.ydevsphere/project.json</code>
+        <code class="rounded bg-surface-2 px-1 py-0.5 text-xs">.ydevsphere/project.json</code>
         {{ t("memoryDialog.bodySuffix") }}
       </p>
-      <p class="mt-2 text-xs text-gray-400">
+      <p class="mt-2 text-xs text-faint">
         {{ t("memoryDialog.note") }}<code>.ydevsphere/</code>{{ t("memoryDialog.noteSuffix") }}
       </p>
 
       <div class="mt-6 flex justify-end gap-3">
         <button
-          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          class="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-surface-2"
           :disabled="working"
           @click="handleSkip"
         >
           {{ t("memoryDialog.skip") }}
         </button>
         <button
-          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+          class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
           :disabled="working"
           @click="handleEnable"
         >

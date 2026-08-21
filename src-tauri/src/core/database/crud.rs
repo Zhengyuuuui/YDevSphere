@@ -13,6 +13,7 @@ use rusqlite::params;
 use super::connection::Database;
 use crate::core::models::{
     DetectedProject, Project, ProjectDetail, ProjectKind, ScanHistory,
+    TechnologiesJson,
 };
 
 /// 当前进程统一的「当前时间」字符串（RFC3339，UTC），
@@ -76,8 +77,8 @@ impl Database {
         let tx_result = (|| -> rusqlite::Result<()> {
             let mut stmt = conn.prepare_cached(
                 "INSERT INTO projects
-                   (name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL)
+                   (name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id, technologies_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, NULL, ?12)
                  ON CONFLICT(path) DO UPDATE SET
                     name = excluded.name,
                     language = excluded.language,
@@ -87,11 +88,13 @@ impl Database {
                     last_scan_at = excluded.last_scan_at,
                     workspace = excluded.workspace,
                     kind = excluded.kind,
-                    health_score = excluded.health_score",
+                    health_score = excluded.health_score,
+                    technologies_json = excluded.technologies_json",
             )?;
 
             for p in detected {
                 let file_count = count_files(&p.path);
+                let tech_json = TechnologiesJson::new(p.technologies.clone()).encode();
                 stmt.execute(params![
                     p.name,
                     p.path,
@@ -104,6 +107,7 @@ impl Database {
                     p.workspace,
                     p.kind.as_db(),
                     p.health_score,
+                    tech_json,
                 ])?;
             }
 
@@ -225,7 +229,7 @@ impl Database {
     pub fn get_project_detail(&self, id: i64) -> rusqlite::Result<Option<ProjectDetail>> {
         let conn = self.connection();
         let result = conn.query_row(
-            "SELECT id, name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id
+            "SELECT id, name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id, technologies_json
              FROM projects WHERE id = ?1",
             params![id],
             project_detail_from_row,
@@ -311,7 +315,7 @@ impl Database {
 
 /// 查询项目字段的基础 SELECT 前缀（含新增元数据列）。
 const SELECT_PROJECT_SQL: &str =
-    "SELECT id, name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id FROM projects";
+    "SELECT id, name, path, language, framework, created_at, updated_at, file_count, last_scan_at, workspace, kind, health_score, parent_id, technologies_json FROM projects";
 
 /// 计算 `workspace_filter` 对应的 WHERE 条件与绑定前缀。
 ///
@@ -356,7 +360,15 @@ fn project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
         kind: ProjectKind::from_db(row.get::<_, Option<String>>(10)?.as_deref()),
         health_score: row.get(11)?,
         parent_id: row.get(12)?,
+        technologies: technologies_from_row(row),
     })
+}
+
+/// 从结果集行读取 `technologies_json`（索引 13）并解析为技术列表。
+fn technologies_from_row(row: &rusqlite::Row<'_>) -> Vec<crate::core::models::Technology> {
+    TechnologiesJson::decode(row.get::<_, Option<String>>(13).ok().flatten().as_deref())
+        .technologies
+        .to_vec()
 }
 
 /// 从结果集行构造 `ProjectDetail`（列序与 `project_from_row` 一致）。
@@ -375,6 +387,7 @@ fn project_detail_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectD
         kind: ProjectKind::from_db(row.get::<_, Option<String>>(10)?.as_deref()),
         health_score: row.get(11)?,
         parent_id: row.get(12)?,
+        technologies: technologies_from_row(row),
     })
 }
 
@@ -983,5 +996,92 @@ mod tests {
         let mut names: Vec<_> = remaining.iter().map(|p| p.name.as_str()).collect();
         names.sort();
         assert_eq!(names, vec!["frontend", "sub2api"]);
+    }
+
+    // ---- V04-RECOGNITION（PR1）：parent_id / kind / technologies_json 落库与读回 ----
+
+    use crate::core::models::{
+        TechnologiesJson, Technology, TechnologyCategory,
+    };
+
+    fn vue_tech() -> Technology {
+        Technology::new(
+            "vue",
+            "Vue",
+            TechnologyCategory::Framework,
+            Some("javascript".into()),
+        )
+    }
+
+    /// technologies_json 落库并读回：DetectedProject 携带 technologies，
+    /// upsert 后 Project / ProjectDetail 应能读回同样的技术列表。
+    #[test]
+    fn upsert_persists_and_reads_back_technologies() {
+        let db = memory_db();
+
+        // 构造带技术栈的真项目（parent = None，顶层）。
+        let mut detected = DetectedProject::new_with_kind(
+            "frontend",
+            "/tmp/agg/frontend",
+            Some("Node".into()),
+            Some("Vue".into()),
+            None,
+            ProjectKind::Real,
+            70,
+            None,
+        );
+        detected.technologies = vec![vue_tech()];
+
+        db.upsert_projects(&[detected]).expect("upsert 应成功");
+
+        // 列表读回：technologies 应包含 vue
+        let all = db.get_projects(None, None, None, None).expect("读取应成功");
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].technologies, vec![vue_tech()]);
+        // 旧字段 language/framework 仍兼容（已回读）
+        assert_eq!(all[0].language.as_deref(), Some("Node"));
+        assert_eq!(all[0].framework.as_deref(), Some("Vue"));
+
+        // 详情读回：technologies 一致
+        let detail = db
+            .get_project_detail(all[0].id)
+            .expect("查询应成功")
+            .expect("应存在");
+        assert_eq!(detail.technologies, vec![vue_tech()]);
+
+        // 数据库原始列应含 schema_version
+        let raw: String = db
+            .connection()
+            .query_row(
+                "SELECT technologies_json FROM projects WHERE id = ?1",
+                params![all[0].id],
+                |r| r.get(0),
+            )
+            .expect("读取原始列应成功");
+        let decoded = TechnologiesJson::decode(Some(&raw));
+        assert_eq!(decoded.schema_version, 1);
+        assert_eq!(decoded.technologies, vec![vue_tech()]);
+    }
+
+    /// 旧数据兼容：technologies_json 为 NULL（旧库）时，读回空技术列表而非报错，
+    /// 且 language/framework 仍可用（前端 fallback 来源）。
+    #[test]
+    fn legacy_row_without_technologies_reads_empty() {
+        let db = memory_db();
+
+        // 绕过 upsert，直接插入一条「旧数据」行（technologies_json 为 NULL）
+        db.connection()
+            .execute(
+                "INSERT INTO projects (name, path, language, framework, kind, parent_id)
+                 VALUES ('legacy', '/tmp/legacy', 'Rust', NULL, 'real', NULL)",
+                [],
+            )
+            .expect("插入旧数据行应成功");
+
+        let all = db.get_projects(None, None, None, None).expect("读取应成功");
+        assert_eq!(all.len(), 1);
+        assert!(all[0].technologies.is_empty(), "旧数据应回退空技术列表");
+        assert_eq!(all[0].language.as_deref(), Some("Rust"));
+        assert_eq!(all[0].parent_id, None);
     }
 }

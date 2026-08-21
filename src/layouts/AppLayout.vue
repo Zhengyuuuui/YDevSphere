@@ -25,7 +25,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-[#F7F8FA]">
+  <div class="flex h-screen overflow-hidden bg-canvas">
     <AppSidebar />
     <main class="flex-1 overflow-y-auto">
       <RouterView />

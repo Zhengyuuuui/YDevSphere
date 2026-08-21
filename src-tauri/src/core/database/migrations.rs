@@ -16,6 +16,7 @@ pub fn run(conn: &Connection) -> rusqlite::Result<()> {
     migrate_002_add_workspace(conn)?;
     migrate_003_add_project_kind(conn)?;
     migrate_004_backfill_workspace(conn)?;
+    migrate_005_add_technologies_json(conn)?;
     Ok(())
 }
 
@@ -101,6 +102,16 @@ fn backfill_by_prefix(
     Ok(())
 }
 
+/// Migration 005：`projects` 表新增 `technologies_json` 列（V0.4 Recognition Model，PR1）。
+///
+/// 存 `{ "schema_version": 1, "technologies": [...] }`（见 `core::models::TechnologiesJson`）。
+/// - 兼容旧库：已存在项目的该列为 NULL → 读回时空技术列表，前端 fallback `language`/`framework`。
+/// - 保留旧列 `language` / `framework` 不动。
+fn migrate_005_add_technologies_json(conn: &Connection) -> rusqlite::Result<()> {
+    add_column_if_missing(conn, "projects", "technologies_json", "TEXT")?;
+    Ok(())
+}
+
 /// 若 `table` 不存在名为 `column` 的列，则执行 `ALTER TABLE ... ADD COLUMN`。
 fn add_column_if_missing(
     conn: &Connection,
@@ -176,7 +187,8 @@ mod tests {
                 "workspace",
                 "kind",
                 "health_score",
-                "parent_id"
+                "parent_id",
+                "technologies_json"
             ]
         );
 
@@ -200,12 +212,12 @@ mod tests {
 
         let count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name IN ('file_count','last_scan_at','workspace','kind','health_score','parent_id')",
+                "SELECT COUNT(*) FROM pragma_table_info('projects') WHERE name IN ('file_count','last_scan_at','workspace','kind','health_score','parent_id','technologies_json')",
                 [],
                 |r| r.get(0),
             )
             .expect("查询应成功");
-        assert_eq!(count, 6, "新增列应各只有一列");
+        assert_eq!(count, 7, "新增列应各只有一列");
     }
 
     // ---- V02-BUG-BACKEND：旧数据回溯回填 workspace ----

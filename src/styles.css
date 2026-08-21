@@ -1,3 +1,151 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+   Theme  ·  语义色（light / dark）
+   ------------------------------------------------------------
+   <html data-theme="light|dark"> 由 theme store 设置。
+   所有颜色通过语义变量表达；dark 下字体/边框/背景整体适配。
+   ============================================================ */
+:root,
+:root[data-theme="light"] {
+  --color-canvas: #f7f8fa;          /* 页面背景 */
+  --color-surface: #ffffff;         /* 卡片/面板 */
+  --color-surface-2: #f3f4f6;       /* hover / 次级面板 */
+  --color-surface-3: #fafafa;       /* 行 hover / 浅底 */
+  --color-ink: #17191c;             /* 主文字 */
+  --color-muted: #6b7280;           /* 次要文字 */
+  --color-faint: #9ca3af;           /* 弱化文字 */
+  --color-fainter: #c4c9d0;         /* 更弱文字/分组标签 */
+  --color-line: #cbd1d8;            /* 边框（低饱和深灰，明显但不刺眼） */
+  --color-line-2: #e4e7ec;          /* 弱边框 */
+  --color-line-3: #d8dde3;          /* 行分隔 */
+  --color-divider: #d8dde3;         /* 极弱分隔线（表格行/区块线，light 与 line-3 同级） */
+  --color-primary: #2563eb;         /* 主色 */
+  --color-primary-hover: #1d4ed8;
+  --color-primary-soft: #eef2ff;    /* 主色淡底（选中高亮） */
+  --color-primary-text: #ffffff;    /* 主色上的文字 */
+  --color-active: #1d4ed8;          /* 选中态文字（表格行） */
+}
+
+:root[data-theme="dark"] {
+  /* Surface 层级（拉开明度差，靠背景分层而非边框） */
+  --color-canvas: #0a0c0e;          /* 页面背景（深基底） */
+  --color-surface: #15181c;         /* 卡片/面板 */
+  --color-surface-2: #1e2329;       /* hover / 次级面板 */
+  --color-surface-3: #1a1f24;       /* 行 hover / 浅底 */
+  --color-ink: #e7e9ec;             /* 主文字（亮） */
+  --color-muted: #a0a7b0;           /* 次要文字 */
+  --color-faint: #6f767e;           /* 弱化文字 */
+  --color-fainter: #565d66;         /* 分组标签 */
+  /* 边框三档（整体降对比，克制；仔细观察才明显） */
+  --color-line: #2a323a;            /* 外框/控件：卡片、弹窗、输入、按钮，中低对比 */
+  --color-line-2: #20262c;          /* 区块分隔/弱框 */
+  --color-line-3: #1b2127;          /* 行分隔：极低对比 */
+  --color-divider: #171c21;         /* 极弱分隔线（表格行/区块线）：几乎融入 surface，肉眼需细看才见 */
+  --color-primary: #3b82f6;         /* 主色（亮） */
+  --color-primary-hover: #2563eb;
+  --color-primary-soft: #1e293b;    /* 主色淡底 */
+  --color-primary-text: #ffffff;
+  --color-active: #93c5fd;          /* 选中态文字（亮蓝） */
+}
+
+/* ============================================================
+   Typography  ·  DESIGN-claude.md 字体分层
+   ------------------------------------------------------------
+   三套字族，统一中英文回退（英文走设计字体，中文回退到系统黑体/宋体）：
+   - 展示/标题  display : 衬线（Cormorant Garamond / Tiempos Headline）
+   - 正文/UI    sans    : 无衬线（Inter / StyreneB）
+   - 代码       mono    : 等宽（JetBrains Mono）
+   Google Fonts 不可达时自动回退到系统栈。
+   ============================================================ */
+:root {
+  /* 展示/标题：衬线 + 中文宋体回退 */
+  --font-display:
+    "Cormorant Garamond", "Tiempos Headline", "Songti SC", "SimSun",
+    Georgia, "Times New Roman", serif;
+  /* 正文/UI：无衬线 + 中文黑体回退 */
+  --font-sans:
+    "Inter", "StyreneB", -apple-system, BlinkMacSystemFont,
+    "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+  /* 代码：等宽 */
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono",
+    "Segoe UI Mono", Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    /* 基础字号 16px → 17px：全局轻微调大所有 rem 文本/间距 */
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    color-scheme: light;
+  }
+  /* dark 下允许浏览器用暗色原生控件（滚动条/表单等） */
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  /* 全局正文：无衬线（中英文），颜色随主题 */
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    letter-spacing: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  /* 主题过渡：颜色切换平滑（不影响布局） */
+  body,
+  button,
+  input,
+  select,
+  textarea,
+  [class*="bg-"],
+  [class*="text-"],
+  [class*="border-"] {
+    transition:
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      color 0.18s ease;
+  }
+
+  /* 展示/标题：衬线 + 负字距（依设计文档，显示层走 serif） */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  /* 代码：等宽 */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+  }
+
+  /* 按钮/导航：无衬线（复用正文栈），保持统一的工具型观感 */
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  /* 显式展示标题工具类：供需要衬线大标题的场景使用 */
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}

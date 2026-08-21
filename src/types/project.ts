@@ -4,6 +4,51 @@
 /** 项目类型（v0.2 Scanner 迭代，对齐 core::models::ProjectKind） */
 export type ProjectKind = "real" | "aggregated_root" | "category";
 
+/**
+ * 技术类别（对齐 core::models::TechnologyCategory，serde snake_case）。
+ *
+ * 架构级（用于前端展示过滤，Spec §7.1）：Language / Runtime / Framework /
+ * Database / BuildTool / PackageManager / Platform。
+ * Library 为「非架构级」，展示时折叠为 `+N libraries`（前端过滤，后端存储层不动）。
+ */
+export type TechnologyCategory =
+  | "language"
+  | "runtime"
+  | "framework"
+  | "library"
+  | "database"
+  | "build_tool"
+  | "package_manager"
+  | "platform";
+
+/**
+ * 单个技术（对齐 core::models::Technology，serde snake_case）。
+ *
+ * - `id`：canonical id（稳定，去重/聚合基于此）。
+ * - `name`：展示名。
+ * - `category`：技术类别。
+ * - `ecosystem`：技术生态，未知为 null。
+ */
+export interface Technology {
+  id: string;
+  name: string;
+  category: TechnologyCategory;
+  ecosystem: string | null;
+}
+
+/**
+ * `projects.technologies_json` 列的 JSON 封装（对齐 core::models::TechnologiesJson）。
+ *
+ * 后端落库：`{ "schema_version": 1, "technologies": [...] }`。
+ * 旧数据（technologies_json 为 NULL）→ 前端 `Project.technologies` 为空数组，
+ * 展示时回退 `language` / `framework`（旧字段兼容）。
+ */
+export interface TechnologiesJson {
+  /** JSON 结构版本（当前 = 1） */
+  schema_version: number;
+  technologies: Technology[];
+}
+
 /** 目录树节点（按需返回，供前端懒加载目录树，对齐 core::models::DirNode） */
 export interface DirNode {
   /** 子项名称（目录 / 文件名） */
@@ -39,6 +84,13 @@ export interface Project {
   health_score: number;
   /** 父项目 id（聚合根 / 分类目录下的树形归属；顶层为 null） */
   parent_id: number | null;
+  /**
+   * 技术栈列表（V0.4 PR1，对齐后端 Project.technologies）。
+   *
+   * 后端由 `technologies_json` 列解析；旧数据为空数组时前端回退
+   * `language` / `framework`。聚合根为子项目 derived 并集（含 library）。
+   */
+  technologies: Technology[];
 }
 
 /** 项目详情（对齐 core::models::ProjectDetail） */
@@ -62,6 +114,11 @@ export interface ProjectDetail {
   health_score: number;
   /** 父项目 id */
   parent_id: number | null;
+  /**
+   * 技术栈列表（V0.4 PR1，对齐后端 ProjectDetail.technologies）。
+   * 聚合根为 derived 并集；空数组时回退 language / framework（旧数据）。
+   */
+  technologies: Technology[];
 }
 
 /** 扫描历史记录（对齐 scan_history 表 / core::models::ScanHistory） */

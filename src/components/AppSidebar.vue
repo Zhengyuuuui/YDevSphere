@@ -3,13 +3,11 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "@/stores/settings";
-import { useProjectStore } from "@/stores/project";
 import { useLayoutStore } from "@/stores/layout";
 
 const route = useRoute();
 const router = useRouter();
 const settings = useSettingsStore();
-const projectStore = useProjectStore();
 const layout = useLayoutStore();
 const { t } = useI18n();
 
@@ -26,14 +24,38 @@ const activeKey = computed(() => {
   return "";
 });
 
-/** 工作区显示名（多工作区时显示数量，单个时显示路径最后一段） */
-const workspaceName = computed(() => {
+/** 路径是否含指定目录段（如 .../Documents 或以 .../Documents/ 开头） */
+function hasSegment(path: string, name: string): boolean {
+  const segs = path.split(/[\\/]/).filter(Boolean);
+  return segs.includes(name);
+}
+
+/** 侧边栏工作区项 */
+interface WorkspaceItem {
+  key: string;
+  label: string;
+  count: number;
+}
+
+/**
+ * 工作区分组（v0.4）。
+ * 将 settings.workspaces（路径列表）按路径分类为 Documents / Desktop 两组，
+ * 其他手动路径本轮不展示（后续自定义工作区）。
+ */
+const workspaceGroups = computed<WorkspaceItem[]>(() => {
   const ws = settings.workspaces;
-  if (ws.length === 0) return t("workspace.none");
-  if (ws.length > 1) return t("workspace.multiple", { count: ws.length });
-  const segs = ws[0].split(/[\\/]/).filter(Boolean);
-  return segs[segs.length - 1] || ws[0];
+  const groups: WorkspaceItem[] = [];
+  const docs = ws.filter((p) => hasSegment(p, "Documents"));
+  const desktop = ws.filter((p) => hasSegment(p, "Desktop"));
+  if (docs.length > 0) groups.push({ key: "documents", label: t("workspace.documents"), count: docs.length });
+  if (desktop.length > 0) groups.push({ key: "desktop", label: t("workspace.desktop"), count: desktop.length });
+  return groups;
 });
+
+/** 渲染用：无已识别工作区时回退为空态（避免破版） */
+const workspaceItems = computed<WorkspaceItem[]>(() =>
+  workspaceGroups.value.length > 0 ? workspaceGroups.value : [{ key: "none", label: t("workspace.none"), count: 0 }],
+);
 
 const navItems = computed(() => [
   { key: "overview", label: t("nav.overview"), to: "/overview" },
@@ -44,11 +66,26 @@ const navItems = computed(() => [
 function navigate(to: string) {
   router.push(to);
 }
+
+/**
+ * 打开某工作区分组 → 进入 /projects 并应用对应分类筛选。
+ * 无分类的占位项（none）仍进入聚合 /projects。
+ */
+function openWorkspace(item: WorkspaceItem) {
+  if (item.key === "documents" || item.key === "desktop") {
+    router.push({ path: "/projects", query: { workspace: item.key } });
+  } else {
+    router.push({ path: "/projects", query: {} });
+  }
+}
 </script>
 
 <template>
   <aside
-    class="flex h-full shrink-0 select-none flex-col border-r border-[#E5E7EB] bg-white transition-[width] duration-150 ease-out"
+    class="flex h-full shrink-0 select-none flex-col bg-surface transition-[width] duration-150 ease-out"
+    :style="{
+      boxShadow: 'inset -1px 0 0 var(--color-line-3)',
+    }"
     :class="isCollapsed ? 'w-[72px]' : 'w-[220px]'"
   >
     <!-- Logo -->
@@ -64,18 +101,18 @@ function navigate(to: string) {
       />
       <span
         v-if="!isCollapsed"
-        class="text-[13px] font-semibold tracking-tight text-[#17191C]"
+        class="font-display text-[15px] font-semibold tracking-tight text-ink"
       >
         YDevSphere
       </span>
     </div>
 
-    <div class="mx-3 h-px bg-[#F0F1F3]" />
+    <div class="mx-3 h-px bg-line-2" />
 
     <!-- Navigation -->
     <nav class="flex-1 overflow-y-auto px-2 pt-1">
       <div v-if="!isCollapsed" class="px-3 pb-1 pt-3">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#C4C9D0]">
+        <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-fainter">
           {{ t("nav.main") }}
         </span>
       </div>
@@ -84,12 +121,12 @@ function navigate(to: string) {
         <button
           v-for="item in navItems"
           :key="item.key"
-          class="flex w-full items-center gap-2.5 rounded-[6px] text-left text-[13px] transition-colors duration-75"
+          class="flex w-full items-center gap-2.5 rounded-[6px] text-left text-[14px] transition-colors duration-75"
           :class="[
             isCollapsed ? 'justify-center px-0 py-[9px]' : 'px-3 py-[7px]',
             activeKey === item.key
-              ? 'bg-[#EEF2FF] font-medium text-[#2563EB]'
-              : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]',
+              ? 'bg-primary-soft font-medium text-primary'
+              : 'text-muted hover:bg-surface-2 hover:text-ink',
           ]"
           :title="isCollapsed ? item.label : undefined"
           @click="navigate(item.to)"
@@ -145,7 +182,8 @@ function navigate(to: string) {
           </svg>
           <span
             v-if="!isCollapsed"
-            :class="activeKey === item.key ? 'text-[#2563EB]' : 'text-[#9CA3AF]'"
+            class="font-display"
+            :class="activeKey === item.key ? 'text-primary' : 'text-faint'"
           >
             {{ item.label }}
           </span>
@@ -153,16 +191,19 @@ function navigate(to: string) {
       </div>
 
       <div v-if="!isCollapsed" class="px-3 pb-1 pt-3">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#C4C9D0]">
+        <span class="text-[10px] font-semibold uppercase tracking-[0.1em] text-fainter">
           {{ t("nav.workspace") }}
         </span>
       </div>
 
+      <!-- 工作区分组项：Documents / Desktop（v0.4 按分类展示） -->
       <button
-        class="mt-2 flex w-full items-center gap-2.5 rounded-[6px] text-left text-[13px] text-[#6B7280] transition-colors duration-75 hover:bg-[#F3F4F6] hover:text-[#374151]"
+        v-for="item in workspaceItems"
+        :key="item.key"
+        class="mt-2 flex w-full items-center gap-2.5 rounded-[6px] text-left text-[14px] text-muted transition-colors duration-75 hover:bg-surface-2 hover:text-ink"
         :class="isCollapsed ? 'relative justify-center px-0 py-[9px]' : 'px-3 py-[7px]'"
-        :title="isCollapsed ? `${t('nav.workspace')}: ${workspaceName}` : t('workspace.projectCount')"
-        @click="navigate('/projects')"
+        :title="isCollapsed ? `${t('nav.workspace')}: ${item.label}` : t('workspace.projectCount')"
+        @click="openWorkspace(item)"
       >
         <svg
           width="15"
@@ -173,37 +214,37 @@ function navigate(to: string) {
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="shrink-0 text-[#9CA3AF]"
+          class="shrink-0 text-faint"
         >
           <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
         </svg>
 
         <!-- 展开态：名称 + 计数 -->
         <template v-if="!isCollapsed">
-          <span class="flex-1 truncate">{{ workspaceName }}</span>
-          <span class="shrink-0 text-[11px] text-[#C4C9D0]">
-            {{ projectStore.projects.length }}
+          <span class="font-display flex-1 truncate">{{ item.label }}</span>
+          <span v-if="item.count > 0" class="shrink-0 text-[11px] text-fainter">
+            {{ item.count }}
           </span>
         </template>
         <!-- 收起态：项目数角标 -->
         <span
-          v-else
-          class="absolute right-[9px] top-[3px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#EEF2FF] px-[3px] text-[9px] font-semibold leading-none text-[#2563EB]"
+          v-else-if="item.count > 0"
+          class="absolute right-[9px] top-[3px] flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-primary-soft px-[3px] text-[9px] font-semibold leading-none text-primary"
         >
-          {{ projectStore.projects.length }}
+          {{ item.count }}
         </span>
       </button>
     </nav>
 
     <!-- Settings -->
-    <div class="border-t border-[#F0F1F3] px-2 pb-3 pt-2">
+    <div class="border-t border-divider px-2 pb-3 pt-2">
       <button
-        class="flex w-full items-center gap-2.5 rounded-[6px] text-left text-[13px] transition-colors duration-75"
+        class="flex w-full items-center gap-2.5 rounded-[6px] text-left text-[14px] transition-colors duration-75"
         :class="[
           isCollapsed ? 'justify-center px-0 py-[9px]' : 'px-3 py-[7px]',
           activeKey === 'settings'
-            ? 'bg-[#EEF2FF] font-medium text-[#2563EB]'
-            : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]',
+            ? 'bg-primary-soft font-medium text-primary'
+            : 'text-muted hover:bg-surface-2 hover:text-ink',
         ]"
         :title="isCollapsed ? t('nav.settings') : undefined"
         @click="navigate('/settings')"
@@ -218,14 +259,15 @@ function navigate(to: string) {
           stroke-linecap="round"
           stroke-linejoin="round"
           class="shrink-0"
-          :class="activeKey === 'settings' ? 'text-[#2563EB]' : 'text-[#9CA3AF]'"
+          :class="activeKey === 'settings' ? 'text-primary' : 'text-faint'"
         >
           <circle cx="12" cy="12" r="3" />
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
         <span
           v-if="!isCollapsed"
-          :class="activeKey === 'settings' ? 'text-[#2563EB]' : 'text-[#9CA3AF]'"
+          class="font-display"
+          :class="activeKey === 'settings' ? 'text-primary' : 'text-faint'"
         >
           {{ t("nav.settings") }}
         </span>

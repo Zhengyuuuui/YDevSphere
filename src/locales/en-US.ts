@@ -187,6 +187,11 @@ export default {
     dirTree: "Directory structure",
     dirTreeHint:
       "Lazy-loaded: click a folder to expand sub-directories; only the direct structure of the project root is shown.",
+    techSections: "Tech stack by component",
+    childrenLoading: "Loading sub-projects...",
+    childrenFailed: "Failed to load sub-projects: {msg}",
+    noSubprojects: "No sub-projects",
+    noTechnologies: "No tech stack detected",
   },
   dirTree: {
     loading: "Reading directory structure...",
@@ -252,6 +257,11 @@ export default {
     title: "Settings",
     general: "General",
     language: "Language",
+    appearance: "Appearance",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeSystem: "System",
+    themeDesc: "Text, borders and backgrounds adapt in dark theme.",
     remove: "Remove",
     workspace: "Workspace",
     editor: "Editor",
@@ -312,6 +322,7 @@ export default {
     gitBranch: "Git branch",
     noTech: "No tech stack detected",
     updatedAt: "Updated {time}",
+    librariesSuffix: "+{count} libraries",
   },
   common: {
     none: "None",

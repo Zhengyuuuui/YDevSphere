@@ -17,20 +17,25 @@ interface Style {
   label: string;
 }
 
+/** 深色主题判断（dark 下状态色提亮，保证可读） */
+const isDark = () =>
+  typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
+
 const style = computed<Style>(() => {
+  const dark = isDark();
   switch (props.status) {
     case "clean":
-      return { dot: "#16A34A", text: "#16A34A", label: t("git.clean") };
+      return { dot: dark ? "#4ade80" : "#16A34A", text: dark ? "#4ade80" : "#16A34A", label: t("git.clean") };
     case "dirty":
       return {
-        dot: "#D97706",
-        text: "#D97706",
+        dot: dark ? "#fbbf24" : "#D97706",
+        text: dark ? "#fbbf24" : "#D97706",
         label: `${props.changes ?? 0} ${t("git.changed")}`,
       };
     case "detached":
-      return { dot: "#DC2626", text: "#DC2626", label: t("git.detached") };
+      return { dot: dark ? "#f87171" : "#DC2626", text: dark ? "#f87171" : "#DC2626", label: t("git.detached") };
     default:
-      return { dot: "#9CA3AF", text: "#9CA3AF", label: "—" };
+      return { dot: dark ? "#6b7280" : "#9CA3AF", text: dark ? "#6b7280" : "#9CA3AF", label: "—" };
   }
 });
 </script>
@@ -38,13 +43,13 @@ const style = computed<Style>(() => {
 <template>
   <span
     v-if="status === 'none'"
-    class="text-[12px] text-[#9CA3AF]"
+    class="text-[13px] text-faint"
   >
     —
   </span>
   <span
     v-else
-    class="flex items-center gap-1.5 text-[12px]"
+    class="flex items-center gap-1.5 text-[13px]"
     :style="{ color: style.text }"
   >
     <span

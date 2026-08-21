@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::technology::Technology;
+
 /// 项目类型（v0.2 Scanner 迭代）。
 ///
 /// 判定语义见 `docs/v0.2-scanner-plan.md` §2.1：
@@ -89,6 +91,14 @@ pub struct Project {
     pub health_score: i64,
     /// 父项目 id（聚合根 / 分类目录下的树形归属；顶层为 `None`）。
     pub parent_id: Option<i64>,
+    /// 技术栈列表（V0.4 Recognition Model，PR1）。
+    ///
+    /// 序列化为 `technologies[]`（camelCase 无关，本字段为单词）；
+    /// 由 `projects.technologies_json` 列（含 schema_version）落库并读回。
+    /// 旧数据（technologies_json 为空）回退为空列表，前端可 fallback
+    /// `language` / `framework`。
+    #[serde(default)]
+    pub technologies: Vec<Technology>,
 }
 
 /// 项目详情（列表项 + 附加统计信息）。
@@ -116,6 +126,9 @@ pub struct ProjectDetail {
     pub health_score: i64,
     /// 父项目 id。
     pub parent_id: Option<i64>,
+    /// 技术栈列表（V0.4 Recognition Model，PR1）。
+    #[serde(default)]
+    pub technologies: Vec<Technology>,
 }
 
 /// 扫描结果：一次 `scan_projects` 返回的载荷。
@@ -164,6 +177,9 @@ pub struct DetectedProject {
     pub health_score: i64,
     /// 父项目 path（用于扫描后回填 parent_id；数据库落库前以 path 关联）。
     pub parent_path: Option<String>,
+    /// 技术栈列表（V0.4 Recognition Model，PR1）。
+    #[serde(default)]
+    pub technologies: Vec<Technology>,
 }
 
 impl DetectedProject {
@@ -182,6 +198,7 @@ impl DetectedProject {
             kind: ProjectKind::Real,
             health_score: 0,
             parent_path: None,
+            technologies: Vec::new(),
         }
     }
 
@@ -202,6 +219,7 @@ impl DetectedProject {
             kind: ProjectKind::Real,
             health_score: 0,
             parent_path: None,
+            technologies: Vec::new(),
         }
     }
 
@@ -226,6 +244,7 @@ impl DetectedProject {
             kind,
             health_score,
             parent_path,
+            technologies: Vec::new(),
         }
     }
 }

@@ -442,15 +442,15 @@ function toggleMore() {
           class="mx-auto h-24 w-auto object-contain"
         />
         <h1 class="mt-6 text-4xl font-bold tracking-tight">YDevSphere</h1>
-        <p class="mt-4 text-lg text-gray-600">
+        <p class="mt-4 text-lg text-muted">
           {{ t("workspace.welcomeTagline") }}
         </p>
       </div>
 
-      <!-- 一键导入所有系统工作区 -->
+      <!-- 一键导入所有系统工作区（所有人可用，不设门禁） -->
       <div class="mt-10">
         <button
-          class="group w-full rounded-lg border border-gray-200 bg-white p-6 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+          class="group w-full rounded-lg border border-line-3 bg-surface p-6 text-left shadow-sm transition hover:border-primary hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
           :disabled="
             (!documentsEntry?.exists && !desktopEntry?.exists) ||
             scanner.status === 'scanning'
@@ -458,7 +458,7 @@ function toggleMore() {
           @click="importAll"
         >
           <div class="flex items-center gap-3">
-            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+            <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-soft text-primary">
               <svg
                 class="h-5 w-5"
                 viewBox="0 0 24 24"
@@ -472,22 +472,22 @@ function toggleMore() {
               </svg>
             </span>
             <div>
-              <div class="font-medium text-gray-900">{{ t("workspace.importAll") }}</div>
-              <div class="mt-0.5 text-xs text-gray-500">
+              <div class="font-display font-medium text-ink">{{ t("workspace.importAll") }}</div>
+              <div class="mt-0.5 text-xs text-muted">
                 {{ t("workspace.importAllDesc") }}
               </div>
             </div>
           </div>
-          <div v-if="importingAll" class="mt-3 text-xs text-blue-600">
+          <div v-if="importingAll" class="mt-3 text-xs text-primary">
             {{ t("workspace.importing") }}
           </div>
         </button>
       </div>
 
-      <!-- 其他选项 -->
+      <!-- 其他选项（所有人可用） -->
       <div class="mt-4 text-center">
         <button
-          class="text-sm text-gray-500 hover:text-gray-700"
+          class="text-sm text-muted hover:text-ink"
           @click="toggleMore"
         >
           {{ moreOpen ? t("workspace.collapseOptions") : t("workspace.moreOptions") }}
@@ -495,53 +495,53 @@ function toggleMore() {
 
         <div
           v-if="moreOpen"
-          class="mx-auto mt-3 max-w-sm overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+          class="mx-auto mt-3 max-w-sm overflow-hidden rounded-lg border border-line-3 bg-surface shadow-sm"
         >
           <button
-            class="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50"
+            class="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-ink hover:bg-surface-3"
             @click="chooseWorkspace"
           >
             <span>{{ t("workspace.select") }}</span>
-            <span class="text-gray-400">{{ t("workspace.manualSelect") }}</span>
+            <span class="text-faint">{{ t("workspace.manualSelect") }}</span>
           </button>
           <button
-            class="flex w-full items-center justify-between border-t border-gray-100 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="flex w-full items-center justify-between border-t border-line-2 px-4 py-3 text-left text-sm text-ink hover:bg-surface-3 disabled:opacity-50"
             :disabled="!documentsEntry?.exists || scanner.status === 'scanning'"
             @click="importWorkspace(documentsEntry)"
           >
             <span>{{ t("workspace.importDocuments") }}</span>
-            <span class="text-gray-400">{{ documentsEntry?.exists ? t("workspace.available") : t("workspace.notExist") }}</span>
+            <span class="text-faint">{{ documentsEntry?.exists ? t("workspace.available") : t("workspace.notExist") }}</span>
           </button>
           <button
-            class="flex w-full items-center justify-between border-t border-gray-100 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            class="flex w-full items-center justify-between border-t border-line-2 px-4 py-3 text-left text-sm text-ink hover:bg-surface-3 disabled:opacity-50"
             :disabled="!desktopEntry?.exists || scanner.status === 'scanning'"
             @click="importWorkspace(desktopEntry)"
           >
             <span>{{ t("workspace.importDesktop") }}</span>
-            <span class="text-gray-400">{{ desktopEntry?.exists ? t("workspace.available") : t("workspace.notExist") }}</span>
+            <span class="text-faint">{{ desktopEntry?.exists ? t("workspace.available") : t("workspace.notExist") }}</span>
           </button>
         </div>
       </div>
 
-      <p v-if="settings.error" class="mt-4 text-center text-sm text-red-600">
+      <p v-if="settings.error" class="mt-4 text-center text-sm text-red-600 dark:text-red-400">
         {{ settings.error }}
       </p>
 
       <!-- 编辑器引导 · 旧版视图（纵向列表卡片，guideView === 'list' 时显示） -->
       <div
         v-if="editorGuideOpen && guideView === 'list'"
-        class="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+        class="mt-6 rounded-lg border border-line-3 bg-surface p-6 shadow-sm"
       >
         <div class="flex items-center justify-between">
-          <h2 class="text-base font-semibold text-gray-900">
+          <h2 class="text-base font-semibold text-ink">
             {{ t("guide.title") }}
           </h2>
-          <span class="text-xs text-gray-400">{{ t("guide.optional") }}</span>
+          <span class="text-xs text-faint">{{ t("guide.optional") }}</span>
         </div>
-        <p class="mt-1 text-sm text-gray-500">{{ t("guide.subtitle") }}</p>
+        <p class="mt-1 text-sm text-muted">{{ t("guide.subtitle") }}</p>
 
         <!-- 加载中 -->
-        <div v-if="editorStore.candidatesLoading" class="mt-4 text-sm text-gray-400">
+        <div v-if="editorStore.candidatesLoading" class="mt-4 text-sm text-faint">
           {{ t("guide.loading") }}
         </div>
 
@@ -550,35 +550,35 @@ function toggleMore() {
           <button
             v-for="ed in editorStore.candidates"
             :key="ed.id"
-            class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-100 px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
-            :class="guideSelectedId === ed.id ? 'border-blue-300 bg-blue-50' : ''"
+            class="flex w-full items-center justify-between gap-2 rounded-md border border-line-2 px-3 py-2 text-left transition-colors hover:border-primary hover:bg-primary-soft"
+            :class="guideSelectedId === ed.id ? 'border-primary bg-primary-soft' : ''"
             @click="pickGuideCandidate(ed)"
           >
-            <span class="min-w-0 truncate text-sm text-gray-700">
+            <span class="min-w-0 truncate text-sm text-ink">
               {{ ed.name }}
             </span>
             <span
               v-if="guideSelectedId === ed.id"
-              class="shrink-0 text-[12px] font-medium text-[#2563EB]"
+              class="shrink-0 text-[13px] font-medium text-primary"
             >
               {{ t("guide.selected") }}
             </span>
-            <span v-else class="shrink-0 text-[12px] text-[#2563EB]">{{ t("editor.select") }}</span>
+            <span v-else class="shrink-0 text-[13px] text-primary">{{ t("editor.select") }}</span>
           </button>
-          <div v-if="editorStore.candidates.length === 0" class="py-4 text-center text-sm text-gray-400">
+          <div v-if="editorStore.candidates.length === 0" class="py-4 text-center text-sm text-faint">
             {{ t("editor.noCandidates") }}
           </div>
         </div>
 
         <div class="mt-5 flex items-center justify-between">
           <button
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700"
+            class="text-sm text-muted transition-colors hover:text-ink"
             @click="finishEditorGuide"
           >
             {{ t("guide.skip") }}
           </button>
           <button
-            class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
             @click="finishEditorGuide"
           >
             {{ t("guide.done") }}
@@ -591,20 +591,20 @@ function toggleMore() {
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
           @click.self="guidePendingCustom = null"
         >
-          <div class="w-[400px] rounded-[10px] border border-gray-200 bg-white p-5 shadow-lg">
-            <h3 class="text-[15px] font-semibold text-gray-900">{{ t("editor.confirmTitle") }}</h3>
-            <p class="mt-2 text-[13px] text-gray-600">
+          <div class="w-[400px] rounded-[10px] border border-line-3 bg-surface p-5 shadow-lg">
+            <h3 class="text-[15px] font-semibold text-ink">{{ t("editor.confirmTitle") }}</h3>
+            <p class="mt-2 text-[14px] text-muted">
               {{ t("editor.confirmBody", { name: guidePendingCustom.name }) }}
             </p>
             <div class="mt-5 flex justify-end gap-2">
               <button
-                class="rounded-[7px] border border-gray-200 px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                class="rounded-[7px] border border-line px-4 py-2 text-[14px] text-ink hover:bg-surface-3"
                 @click="guidePendingCustom = null"
               >
                 {{ t("editor.cancel") }}
               </button>
               <button
-                class="rounded-[7px] bg-blue-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-blue-700"
+                class="rounded-[7px] bg-primary px-4 py-2 text-[14px] font-medium text-white hover:bg-primary-hover"
                 @click="confirmGuideCustom(guidePendingCustom)"
               >
                 {{ t("editor.confirm") }}
@@ -620,14 +620,14 @@ function toggleMore() {
         class="mt-4"
       >
         <!-- 溢出时提示可拖动 -->
-        <p v-if="forkIcons.length > 0 && iconOverflow" class="text-xs text-gray-400">
+        <p v-if="forkIcons.length > 0 && iconOverflow" class="text-xs text-faint">
           {{ t("guide.scrollHint") }}
         </p>
 
         <!-- Viewport：overflow-hidden（无滚动条）+ Pointer Drag / Wheel / Hover 交互 -->
         <div
           ref="iconScroller"
-          class="mt-3 touch-pan-y select-none overflow-hidden border-y border-gray-200 py-3"
+          class="mt-3 touch-pan-y select-none overflow-hidden border-y border-line py-3"
           @mouseenter="hovering = true"
           @mouseleave="hovering = false"
           @pointerdown="onPointerDown"
@@ -648,7 +648,7 @@ function toggleMore() {
                 v-for="(ed, index) in forkIcons"
                 :key="ed.id + '-c' + setIdx + '-' + index"
                 class="flex w-[112px] shrink-0 flex-col items-center justify-center rounded-[10px] p-2 transition-colors"
-                :class="guideSelectedId === ed.id ? 'bg-blue-50' : 'hover:bg-gray-50'"
+                :class="guideSelectedId === ed.id ? 'bg-primary-soft' : 'hover:bg-surface-3'"
                 :title="ed.name"
                 @click="onIconClick(ed)"
               >
@@ -660,13 +660,13 @@ function toggleMore() {
                 />
                 <span
                   v-else
-                  class="flex h-[96px] w-[96px] items-center justify-center rounded-[16px] bg-gray-100 text-[28px] font-medium text-gray-400"
+                  class="flex h-[96px] w-[96px] items-center justify-center rounded-[16px] bg-surface-2 text-[28px] font-medium text-faint"
                 >
                   {{ ed.name.slice(0, 1).toUpperCase() }}
                 </span>
                 <span
                   v-if="guideSelectedId === ed.id"
-                  class="mt-1 rounded-[3px] bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                  class="mt-1 rounded-[3px] bg-primary px-1.5 py-0.5 text-[10px] font-medium text-white"
                 >
                   {{ t("guide.selected") }}
                 </span>
@@ -676,7 +676,7 @@ function toggleMore() {
         </div>
 
         <!-- 无可用 Fork 图标 -->
-        <div v-if="forkIcons.length === 0" class="py-4 text-center text-sm text-gray-400">
+        <div v-if="forkIcons.length === 0" class="py-4 text-center text-sm text-faint">
           {{ t("guide.noForkIcons") }}
         </div>
       </div>
@@ -686,18 +686,18 @@ function toggleMore() {
         v-if="editorGuideOpen"
         class="mt-4 flex items-center justify-between"
       >
-        <div class="flex items-center gap-2 text-[13px]">
+        <div class="flex items-center gap-2 text-[14px]">
           <span
-            class="cursor-pointer font-medium transition-colors"
-            :class="guideView === 'icons' ? 'text-[#2563EB]' : 'text-gray-400 hover:text-gray-600'"
+            class="font-display cursor-pointer font-medium transition-colors"
+            :class="guideView === 'icons' ? 'text-primary' : 'text-faint hover:text-muted'"
             @click="switchGuideView('icons')"
           >
             {{ t("guide.viewNew") }}
           </span>
-          <span class="text-gray-300">/</span>
+          <span class="text-fainter">/</span>
           <span
-            class="cursor-pointer font-medium transition-colors"
-            :class="guideView === 'list' ? 'text-[#2563EB]' : 'text-gray-400 hover:text-gray-600'"
+            class="font-display cursor-pointer font-medium transition-colors"
+            :class="guideView === 'list' ? 'text-primary' : 'text-faint hover:text-muted'"
             @click="switchGuideView('list')"
           >
             {{ t("guide.viewOld") }}
@@ -706,7 +706,7 @@ function toggleMore() {
         <!-- 新版（图标）模式隐藏了引导卡片，需要独立「完成」入口；旧版在卡片内已有 skip/done -->
         <button
           v-if="guideView === 'icons'"
-          class="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          class="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
           @click="finishEditorGuide"
         >
           {{ t("guide.done") }}

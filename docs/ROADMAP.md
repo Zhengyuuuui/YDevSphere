@@ -105,6 +105,11 @@
   - `ProjectDetail` 展示「前端：Vue+Node / 后端：Express+SQLite」分区。
 - **状态**：待排期（v0.4 主线，先做）。
 
+### v0.4c Swift / macOS 原生识别
+- **A（本期，先做）**：基础识别——`Package.swift`（SPM）/ `.xcodeproj` / `.xcworkspace` / 含 `.swift` 文件 → `Swift` 语言 + `Xcode` 工具 + SPM（Swift Package Manager）。
+- **B（后续，记录）**：进阶——解析 `.xcodeproj` 的 platform（iOS/macOS/watchOS）加平台技术；解析 `Package.swift` 的 `.package(url:)` 依赖识别框架（如 Vapor 等）。
+- **状态**：A 本期执行，B 后续。
+
 ### v0.4b 商业化 License（归档，延后）
 - **目标**：**买断制**授权 + **反逆向加密**。
 - **定位**：面向**普通用户 / 个人开发者**，本地优先、不引入 AI 能力（无云端）。

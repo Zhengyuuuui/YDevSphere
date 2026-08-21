@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "@/stores/settings";
 import { useEditorStore } from "@/stores/editor";
 import { useI18nStore } from "@/stores/i18n";
+import { useThemeStore, type ThemeMode } from "@/stores/theme";
 import { DATABASE_LOCATION_DESC } from "@/lib/constants";
 import { getIgnoreRules, setIgnoreRules } from "@/api/ignoreRules";
 import type { InstalledAppInfo } from "@/types";
@@ -23,8 +24,21 @@ type Section =
 const settings = useSettingsStore();
 const editorStore = useEditorStore();
 const i18nStore = useI18nStore();
+const themeStore = useThemeStore();
 const router = useRouter();
 const { t } = useI18n();
+
+/** 主题三态选项 */
+const themeOptions: { value: ThemeMode; label: string }[] = [
+  { value: "light", label: t("settings.themeLight") },
+  { value: "dark", label: t("settings.themeDark") },
+  { value: "system", label: t("settings.themeSystem") },
+];
+
+function onThemeChange(event: Event) {
+  const v = (event.target as HTMLSelectElement).value as ThemeMode;
+  themeStore.setMode(v);
+}
 
 const activeSection = ref<Section>("general");
 /** 登出二次确认框是否打开 / 是否执行中 */
@@ -78,7 +92,9 @@ const SECTIONS = computed<{ key: Section; label: string }[]>(() => [
   { key: "about", label: t("settings.about") },
 ]);
 
-onMounted(() => editorStore.init());
+onMounted(() => {
+  editorStore.init();
+});
 
 async function chooseWorkspace() {
   await settings.selectWorkspacePath();
@@ -210,10 +226,10 @@ async function confirmLogout() {
 </script>
 
 <template>
-  <div class="min-h-full bg-[#F7F8FA]">
+  <div class="min-h-full bg-canvas">
     <div class="mx-auto max-w-[1140px] px-8 py-7">
       <div class="mb-6">
-        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-[#17191C]">
+        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-ink">
           {{ t("settings.title") }}
         </h1>
       </div>
@@ -225,11 +241,11 @@ async function confirmLogout() {
             <button
               v-for="s in SECTIONS"
               :key="s.key"
-              class="flex w-full items-center rounded-[6px] px-3 py-[7px] text-left text-[13px] transition-colors"
+              class="font-display flex w-full items-center rounded-[6px] px-3 py-[7px] text-left text-[14px] transition-colors"
               :class="
                 activeSection === s.key
-                  ? 'bg-[#EEF2FF] font-medium text-[#2563EB]'
-                  : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]'
+                  ? 'bg-primary-soft font-medium text-primary'
+                  : 'text-muted hover:bg-surface-2 hover:text-ink'
               "
               @click="onSelectSection(s.key)"
             >
@@ -239,15 +255,15 @@ async function confirmLogout() {
         </div>
 
         <!-- 设置内容 -->
-        <div class="flex-1 rounded-[8px] border border-[#E5E7EB] bg-white px-6 py-5">
+        <div class="flex-1 rounded-[8px] border border-line-3 bg-surface px-6 py-5">
           <!-- General -->
           <template v-if="activeSection === 'general'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.general") }}</h2>
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.general") }}</h2>
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.language") }}</div>
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.language") }}</div>
               <div class="mt-1">
                 <select
-                  class="w-full max-w-sm rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] focus:border-[#2563EB] focus:outline-none"
+                  class="w-full max-w-sm rounded-lg border border-line bg-surface px-3 py-2 text-[14px] focus:border-primary focus:outline-none"
                   :value="i18nStore.locale"
                   @change="onLanguageChange"
                 >
@@ -261,15 +277,35 @@ async function confirmLogout() {
                 </select>
               </div>
             </div>
-            <div class="border-b border-[#F3F4F6]" />
+            <div class="border-b border-line-2" />
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.appName") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">YDevSphere</div>
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.appearance") }}</div>
+              <div class="mt-1">
+                <select
+                  class="w-full max-w-sm rounded-lg border border-line bg-surface px-3 py-2 text-[14px] text-ink focus:border-primary focus:outline-none"
+                  :value="themeStore.mode"
+                  @change="onThemeChange"
+                >
+                  <option
+                    v-for="opt in themeOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <p class="mt-1 text-[13px] text-faint">{{ t("settings.themeDesc") }}</p>
+              </div>
             </div>
-            <div class="border-b border-[#F3F4F6]" />
+            <div class="border-b border-line-2" />
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.appDesc") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.appName") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">YDevSphere</div>
+            </div>
+            <div class="border-b border-line-2" />
+            <div class="py-3.5">
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.appDesc") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">
                 {{ t("settings.appDescText") }}
               </div>
             </div>
@@ -277,33 +313,33 @@ async function confirmLogout() {
 
           <!-- Workspace -->
           <template v-else-if="activeSection === 'workspace'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.workspace") }}</h2>
-            <p class="text-[13px] text-[#9CA3AF]">
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.workspace") }}</h2>
+            <p class="text-[14px] text-faint">
               {{ t("settings.workspaceDesc") }}
             </p>
 
             <button
-              class="mt-4 rounded-[7px] bg-[#2563EB] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#1D4ED8] disabled:opacity-60"
+              class="mt-4 rounded-[7px] bg-primary px-4 py-2 text-[14px] font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
               :disabled="settings.selecting"
               @click="chooseWorkspace"
             >
               {{ settings.selecting ? t("workspace.selecting") : t("workspace.selectDir") }}
             </button>
 
-            <div class="mt-4 rounded-lg border border-[#F3F4F6] bg-[#FAFAFA] p-4">
-              <div class="text-[12px] text-[#9CA3AF]">{{ t("workspace.added", { count: settings.workspaces.length }) }}</div>
-              <div v-if="settings.workspaces.length === 0" class="mt-1 text-[13px] text-[#17191C]">
+            <div class="mt-4 rounded-lg border border-line-2 bg-surface-3 p-4">
+              <div class="text-[13px] text-faint">{{ t("workspace.added", { count: settings.workspaces.length }) }}</div>
+              <div v-if="settings.workspaces.length === 0" class="mt-1 text-[14px] text-ink">
                 {{ t("workspace.noneAdded") }}
               </div>
               <div v-else class="mt-2 space-y-1.5">
                 <div
                   v-for="ws in settings.workspaces"
                   :key="ws"
-                  class="flex items-center justify-between gap-2 rounded-md border border-[#E5E7EB] bg-white px-3 py-2"
+                  class="flex items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 py-2"
                 >
-                  <span class="min-w-0 break-all text-[13px] text-[#17191C]">{{ ws }}</span>
+                  <span class="min-w-0 break-all text-[14px] text-ink">{{ ws }}</span>
                   <button
-                    class="shrink-0 text-[#9CA3AF] transition-colors hover:text-[#DC2626]"
+                    class="shrink-0 text-faint transition-colors hover:text-red-600 dark:hover:text-red-400"
                     :title="t('workspace.remove')"
                     @click="settings.removeWorkspace(ws)"
                   >
@@ -316,26 +352,26 @@ async function confirmLogout() {
               </div>
             </div>
 
-            <p v-if="settings.error" class="mt-4 text-[13px] text-[#DC2626]">
+            <p v-if="settings.error" class="mt-4 text-[14px] text-red-600 dark:text-red-400">
               {{ t("workspace.operationFailed", { msg: settings.error }) }}
             </p>
           </template>
 
           <!-- Editor -->
           <template v-else-if="activeSection === 'editor'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.editor") }}</h2>
-            <p class="text-[13px] text-[#9CA3AF]">
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.editor") }}</h2>
+            <p class="text-[14px] text-faint">
               {{ t("settings.editorDesc") }}
             </p>
 
-            <div v-if="editorStore.loading" class="mt-4 text-[13px] text-[#9CA3AF]">
+            <div v-if="editorStore.loading" class="mt-4 text-[14px] text-faint">
               {{ t("settings.detectingEditors") }}
             </div>
 
             <div v-else-if="editorStore.editors.length > 0" class="mt-4">
               <div class="flex items-center gap-2">
                 <select
-                  class="w-full max-w-sm rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] focus:border-[#2563EB] focus:outline-none"
+                  class="w-full max-w-sm rounded-lg border border-line bg-surface px-3 py-2 text-[14px] focus:border-primary focus:outline-none"
                   :value="editorStore.defaultEditorId ?? editorStore.editors[0]?.id ?? ''"
                   @change="onEditorChange"
                 >
@@ -348,32 +384,32 @@ async function confirmLogout() {
                   </option>
                 </select>
                 <button
-                  class="shrink-0 rounded-[7px] border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] text-[#374151] transition-colors hover:bg-[#F9FAFB] disabled:opacity-60"
+                  class="shrink-0 rounded-[7px] border border-line bg-surface px-3 py-2 text-[14px] text-ink transition-colors hover:bg-surface-3 disabled:opacity-60"
                   :disabled="editorStore.loading"
                   @click="editorStore.rescan()"
                 >
                   {{ t("editor.rescan") }}
                 </button>
               </div>
-              <p v-if="!editorStore.defaultEditorId" class="mt-2 text-[12px] text-[#9CA3AF]">
+              <p v-if="!editorStore.defaultEditorId" class="mt-2 text-[13px] text-faint">
                 {{ t("settings.noDefaultEditor") }}
               </p>
             </div>
 
             <div
               v-else
-              class="mt-4 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-[13px] text-[#92400E]"
+              class="mt-4 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-[14px] text-[#92400E] dark:border-yellow-900 dark:bg-yellow-950 dark:text-yellow-400"
             >
               {{ t("settings.noEditorDetected") }}
             </div>
 
             <!-- 手动导入应用 -->
-            <div class="mt-5 border-t border-[#F3F4F6] pt-4">
+            <div class="mt-5 border-t border-line-2 pt-4">
               <button
-                class="flex items-center gap-1.5 rounded-[7px] border border-[#E5E7EB] bg-white px-3 py-2 text-[13px] text-[#374151] transition-colors hover:bg-[#F9FAFB]"
+                class="flex items-center gap-1.5 rounded-[7px] border border-line bg-surface px-3 py-2 text-[14px] text-ink transition-colors hover:bg-surface-3"
                 @click="toggleImportPanel"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#9CA3AF]">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-faint">
                   <path d="M12 5v14" />
                   <path d="M5 12h14" />
                 </svg>
@@ -383,9 +419,9 @@ async function confirmLogout() {
               <div v-if="importPanelOpen" class="mt-3">
                 <!-- 顶部提示 + 刷新 -->
                 <div class="mb-2 flex items-center justify-between gap-2">
-                  <p class="text-[11px] text-[#B0B7C3]">{{ t("editor.panelHint") }}</p>
+                  <p class="text-[11px] text-fainter">{{ t("editor.panelHint") }}</p>
                   <button
-                    class="shrink-0 rounded-[5px] px-1.5 py-0.5 text-[11px] text-[#6B7280] transition-colors hover:bg-[#F3F4F6] hover:text-[#374151] disabled:opacity-50"
+                    class="shrink-0 rounded-[5px] px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                     :disabled="editorStore.installedAppsLoading"
                     @click="editorStore.loadInstalledApps(true)"
                   >
@@ -398,7 +434,7 @@ async function confirmLogout() {
                   v-model="installedSearch"
                   type="text"
                   :placeholder="t('editor.searchInstalled')"
-                  class="mb-2 h-[34px] w-full rounded-[7px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#17191C] placeholder:text-[#B0B7C3] focus:border-[#2563EB] focus:outline-none"
+                  class="mb-2 h-[34px] w-full rounded-[7px] border border-line bg-surface px-3 text-[14px] text-ink placeholder:text-fainter focus:border-primary focus:outline-none"
                 />
 
                 <!-- 首次加载动画（骨架屏） -->
@@ -406,17 +442,17 @@ async function confirmLogout() {
                   <div
                     v-for="i in 6"
                     :key="i"
-                    class="flex animate-pulse items-center gap-2.5 rounded-[5px] bg-[#F3F4F6] px-2 py-2"
+                    class="flex animate-pulse items-center gap-2.5 rounded-[5px] bg-surface-2 px-2 py-2"
                   >
-                    <span class="h-[24px] w-[24px] rounded-[5px] bg-[#E5E7EB]" />
-                    <span class="h-[12px] flex-1 rounded bg-[#E5E7EB]" />
+                    <span class="h-[24px] w-[24px] rounded-[5px] bg-line" />
+                    <span class="h-[12px] flex-1 rounded bg-line" />
                   </div>
                 </div>
 
                 <!-- 无应用 -->
                 <div
                   v-else-if="editorStore.installedApps.length === 0"
-                  class="py-4 text-center text-[13px] text-[#9CA3AF]"
+                  class="py-4 text-center text-[14px] text-faint"
                 >
                   {{ t("editor.noInstalledApps") }}
                 </div>
@@ -424,15 +460,15 @@ async function confirmLogout() {
                 <!-- 全部已安装应用列表（图标 + 名称 + 标识） -->
                 <div
                   v-else
-                  class="max-h-[260px] space-y-1 overflow-y-auto rounded-[8px] border border-[#E5E7EB] p-1.5"
+                  class="max-h-[260px] space-y-1 overflow-y-auto rounded-[8px] border border-line-3 p-1.5"
                 >
-                  <div v-if="filteredInstalledApps.length === 0" class="py-4 text-center text-[13px] text-[#9CA3AF]">
+                  <div v-if="filteredInstalledApps.length === 0" class="py-4 text-center text-[14px] text-faint">
                     {{ t("editor.noInstalledApps") }}
                   </div>
                   <button
                     v-for="app in filteredInstalledApps"
                     :key="app.path"
-                    class="flex w-full items-center gap-2.5 rounded-[5px] px-2 py-1.5 text-left transition-colors hover:bg-[#F9FAFB] disabled:opacity-60"
+                    class="flex w-full items-center gap-2.5 rounded-[5px] px-2 py-1.5 text-left transition-colors hover:bg-surface-3 disabled:opacity-60"
                     :disabled="editorStore.importingApp === app.path || editorStore.isAppImported(app.path)"
                     @click="importInstalledApp(app)"
                   >
@@ -445,21 +481,21 @@ async function confirmLogout() {
                     />
                     <span
                       v-else
-                      class="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[5px] bg-[#F3F4F6] text-[11px] font-medium text-[#9CA3AF]"
+                      class="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-[5px] bg-surface-2 text-[11px] font-medium text-faint"
                     >
                       {{ app.name.slice(0, 1).toUpperCase() }}
                     </span>
 
                     <!-- 名称 + 标识 -->
                     <span class="min-w-0 flex-1">
-                      <span class="block truncate text-[13px] text-[#374151]">{{ app.name }}</span>
-                      <span v-if="app.bundle_id" class="block truncate text-[11px] text-[#B0B7C3]">{{ app.bundle_id }}</span>
+                      <span class="block truncate text-[14px] text-ink">{{ app.name }}</span>
+                      <span v-if="app.bundle_id" class="block truncate text-[11px] text-fainter">{{ app.bundle_id }}</span>
                     </span>
 
                     <!-- Fork 标识 -->
                     <span
                       v-if="app.has_product_json"
-                      class="shrink-0 rounded-[3px] bg-[#EEF2FF] px-1 py-[1px] text-[10px] text-[#4338CA]"
+                      class="shrink-0 rounded-[3px] bg-primary-soft px-1 py-[1px] text-[10px] text-[#4338CA] dark:text-blue-300"
                     >
                       {{ t("editor.vscodeFork") }}
                     </span>
@@ -467,53 +503,53 @@ async function confirmLogout() {
                     <!-- 已导入 / 导入中 / 导入 -->
                     <span
                       v-if="editorStore.isAppImported(app.path)"
-                      class="shrink-0 text-[12px] text-[#9CA3AF]"
+                      class="shrink-0 text-[13px] text-faint"
                     >
                       {{ t("editor.alreadyImported") }}
                     </span>
                     <span
                       v-else-if="editorStore.importingApp === app.path"
-                      class="shrink-0 text-[12px] text-[#9CA3AF]"
+                      class="shrink-0 text-[13px] text-faint"
                     >
                       {{ t("editor.importing") }}
                     </span>
-                    <span v-else class="shrink-0 text-[12px] text-[#2563EB]">{{ t("editor.pickApp") }}</span>
+                    <span v-else class="shrink-0 text-[13px] text-primary">{{ t("editor.pickApp") }}</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            <p v-if="editorStore.error" class="mt-4 text-[13px] text-[#DC2626]">
+            <p v-if="editorStore.error" class="mt-4 text-[14px] text-red-600 dark:text-red-400">
               {{ t("settings.editorDetectFailed", { msg: editorStore.error }) }}
             </p>
           </template>
 
           <!-- Ignore Rules -->
           <template v-else-if="activeSection === 'ignore'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.ignore") }}</h2>
-            <p class="text-[13px] text-[#9CA3AF]">
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.ignore") }}</h2>
+            <p class="text-[14px] text-faint">
               {{ t("settings.ignoreDesc") }}
             </p>
 
             <!-- 预设规则（只读说明） -->
             <div class="mt-4">
-              <div class="text-[12px] font-medium text-[#6B7280]">{{ t("settings.presetIgnore") }}</div>
+              <div class="text-[13px] font-medium text-muted">{{ t("settings.presetIgnore") }}</div>
               <div class="mt-2 flex flex-wrap gap-1.5">
                 <span
                   v-for="d in PRESET_IGNORE"
                   :key="d"
-                  class="inline-flex items-center rounded-[4px] bg-[#F3F4F6] px-[8px] py-[3px] text-[12px] text-[#6B7280]"
+                  class="inline-flex items-center rounded-[4px] bg-surface-2 px-[8px] py-[3px] text-[13px] text-muted"
                 >
                   {{ d }}
                 </span>
               </div>
             </div>
 
-            <div class="my-5 border-b border-[#F3F4F6]" />
+            <div class="my-5 border-b border-line-2" />
 
             <!-- 自定义规则 -->
-            <div class="text-[12px] font-medium text-[#6B7280]">{{ t("settings.customIgnore") }}</div>
-            <div v-if="ignoreLoading" class="mt-2 text-[13px] text-[#9CA3AF]">
+            <div class="text-[13px] font-medium text-muted">{{ t("settings.customIgnore") }}</div>
+            <div v-if="ignoreLoading" class="mt-2 text-[14px] text-faint">
               {{ t("settings.ignoreLoading") }}
             </div>
             <template v-else>
@@ -521,7 +557,7 @@ async function confirmLogout() {
                 <span
                   v-for="d in customIgnore"
                   :key="d"
-                  class="inline-flex items-center gap-1 rounded-[4px] bg-[#EEF2FF] px-[8px] py-[3px] text-[12px] text-[#4338CA]"
+                  class="inline-flex items-center gap-1 rounded-[4px] bg-primary-soft px-[8px] py-[3px] text-[13px] text-[#4338CA]"
                 >
                   {{ d }}
                   <button
@@ -535,7 +571,7 @@ async function confirmLogout() {
                     </svg>
                   </button>
                 </span>
-                <span v-if="customIgnore.length === 0" class="text-[12px] text-[#9CA3AF]">
+                <span v-if="customIgnore.length === 0" class="text-[13px] text-faint">
                   {{ t("settings.noCustomIgnore") }}
                 </span>
               </div>
@@ -545,11 +581,11 @@ async function confirmLogout() {
                   v-model="newIgnoreDir"
                   type="text"
                   :placeholder="t('settings.ignorePlaceholder')"
-                  class="h-[36px] w-[280px] rounded-[7px] border border-[#E5E7EB] bg-white px-3 text-[13px] text-[#17191C] placeholder:text-[#B0B7C3] focus:border-[#2563EB] focus:outline-none"
+                  class="h-[36px] w-[280px] rounded-[7px] border border-line bg-surface px-3 text-[14px] text-ink placeholder:text-fainter focus:border-primary focus:outline-none"
                   @keyup.enter="addIgnoreDir"
                 />
                 <button
-                  class="rounded-[7px] bg-[#2563EB] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#1D4ED8] disabled:opacity-60"
+                  class="rounded-[7px] bg-primary px-4 py-2 text-[14px] font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-60"
                   :disabled="!newIgnoreDir.trim()"
                   @click="addIgnoreDir"
                 >
@@ -557,10 +593,10 @@ async function confirmLogout() {
                 </button>
               </div>
 
-              <p class="mt-3 text-[12px] text-[#9CA3AF]">
+              <p class="mt-3 text-[13px] text-faint">
                 {{ t("settings.ignoreTip") }}
               </p>
-              <p v-if="ignoreError" class="mt-2 text-[13px] text-[#DC2626]">
+              <p v-if="ignoreError" class="mt-2 text-[14px] text-[#DC2626]">
                 {{ ignoreError }}
               </p>
             </template>
@@ -568,17 +604,17 @@ async function confirmLogout() {
 
           <!-- Privacy -->
           <template v-else-if="activeSection === 'privacy'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.privacy") }}</h2>
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.privacy") }}</h2>
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.privacyDataStorage") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.privacyDataStorage") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">
                 {{ t("settings.privacyDataStorageDesc") }}
               </div>
             </div>
-            <div class="border-b border-[#F3F4F6]" />
+            <div class="border-b border-line-2" />
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.privacyMemory") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.privacyMemory") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">
                 {{ t("settings.privacyMemoryDesc") }}
               </div>
             </div>
@@ -586,39 +622,39 @@ async function confirmLogout() {
 
           <!-- Database -->
           <template v-else-if="activeSection === 'database'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.database") }}</h2>
-            <p class="text-[13px] text-[#9CA3AF]">
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.database") }}</h2>
+            <p class="text-[14px] text-faint">
               {{ t("settings.dbDesc") }}
             </p>
-            <div class="mt-4 rounded-lg border border-[#F3F4F6] bg-[#FAFAFA] p-4">
-              <div class="text-[12px] text-[#9CA3AF]">{{ t("settings.dbLocation") }}</div>
-              <div class="mt-1 text-[13px] text-[#17191C]">{{ DATABASE_LOCATION_DESC }}</div>
+            <div class="mt-4 rounded-lg border border-line-2 bg-surface-3 p-4">
+              <div class="text-[13px] text-faint">{{ t("settings.dbLocation") }}</div>
+              <div class="mt-1 text-[14px] text-ink">{{ DATABASE_LOCATION_DESC }}</div>
             </div>
           </template>
 
           <!-- About -->
           <template v-else-if="activeSection === 'about'">
-            <h2 class="mb-4 text-[14px] font-semibold text-[#17191C]">{{ t("settings.about") }}</h2>
+            <h2 class="mb-4 text-[15px] font-semibold text-ink">{{ t("settings.about") }}</h2>
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.version") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">v0.2.0</div>
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.version") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">v0.2.0</div>
             </div>
-            <div class="border-b border-[#F3F4F6]" />
+            <div class="border-b border-line-2" />
             <div class="py-3.5">
-              <div class="text-[13px] font-medium text-[#17191C]">{{ t("settings.techStack") }}</div>
-              <div class="mt-0.5 text-[12px] text-[#9CA3AF]">
+              <div class="font-display text-[14px] font-medium text-ink">{{ t("settings.techStack") }}</div>
+              <div class="mt-0.5 text-[13px] text-faint">
                 Vue 3 · TypeScript · Tauri 2 · Rust
               </div>
             </div>
-            <div class="border-b border-[#F3F4F6]" />
+            <div class="border-b border-line-2" />
             <div class="pt-4">
               <button
-                class="rounded-[7px] border border-[#FCA5A5] px-4 py-2 text-[13px] font-medium text-[#DC2626] transition-colors hover:bg-[#FEF2F2]"
+                class="rounded-[7px] border border-[#FCA5A5] px-4 py-2 text-[14px] font-medium text-[#DC2626] transition-colors hover:bg-[#FEF2F2]"
                 @click="openLogoutConfirm"
               >
                 {{ t("settings.logout") }}
               </button>
-              <p class="mt-2 text-[12px] text-[#9CA3AF]">{{ t("settings.logoutConfirm") }}</p>
+              <p class="mt-2 text-[13px] text-faint">{{ t("settings.logoutConfirm") }}</p>
             </div>
           </template>
         </div>
@@ -631,19 +667,19 @@ async function confirmLogout() {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
       @click.self="cancelLogout"
     >
-      <div class="w-[400px] rounded-[10px] border border-gray-200 bg-white p-5 shadow-lg">
-        <h3 class="text-[15px] font-semibold text-gray-900">{{ t("settings.logoutConfirmTitle") }}</h3>
-        <p class="mt-2 text-[13px] text-gray-600">{{ t("settings.logoutConfirm") }}</p>
+      <div class="w-[400px] rounded-[10px] border border-line-3 bg-surface p-5 shadow-lg">
+        <h3 class="text-[15px] font-semibold text-ink">{{ t("settings.logoutConfirmTitle") }}</h3>
+        <p class="mt-2 text-[14px] text-muted">{{ t("settings.logoutConfirm") }}</p>
         <div class="mt-5 flex justify-end gap-2">
           <button
-            class="rounded-[7px] border border-gray-200 px-4 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+            class="rounded-[7px] border border-line px-4 py-2 text-[14px] text-ink hover:bg-surface-2"
             :disabled="logoutBusy"
             @click="cancelLogout"
           >
             {{ t("editor.cancel") }}
           </button>
           <button
-            class="rounded-[7px] bg-red-600 px-4 py-2 text-[13px] font-medium text-white hover:bg-red-700 disabled:opacity-60"
+            class="rounded-[7px] bg-red-600 px-4 py-2 text-[14px] font-medium text-white hover:bg-red-700 disabled:opacity-60"
             :disabled="logoutBusy"
             @click="confirmLogout"
           >

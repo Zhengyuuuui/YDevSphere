@@ -11,7 +11,7 @@ const emit = defineEmits<{
 <template>
   <button
     class="relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150"
-    :class="enabled ? 'bg-[#2563EB]' : 'bg-[#D1D5DB]'"
+    :class="enabled ? 'bg-primary' : 'bg-line'"
     @click="emit('toggle')"
   >
     <span

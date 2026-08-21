@@ -11,8 +11,15 @@ import type { GitInfo } from "@/types";
  * 所有页面统一经此适配，避免直接搬运 Figma mock 结构。
  */
 
-/** 由后端 language + framework 合成技术栈列表（Figma 的 technologies[] 语义） */
+/** 由后端技术栈合成展示列表（Figma 的 technologies[] 语义，V0.4 PR4）。
+ *
+ * 优先 `Project.technologies`（V0.4 识别引擎产出，含架构级 + library）；
+ * 旧数据（technologies 为空）回退 `language` / `framework`（旧字段兼容）。
+ */
 export function toTechnologies(p: Project): string[] {
+  if (p.technologies && p.technologies.length > 0) {
+    return p.technologies.map((t) => t.name || t.id);
+  }
   return [p.language, p.framework].filter((s): s is string => Boolean(s));
 }
 

@@ -25,17 +25,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900">
-    <ToastContainer />
+  <div class="min-h-screen bg-canvas text-ink">
+  <ToastContainer />
 
-    <!-- 启动恢复中的 loading 遮罩，避免闪烁 / 误跳转 -->
-    <div
-      v-if="settings.restoring"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-gray-50"
-    >
+  <!-- 启动恢复中的 loading 遮罩，避免闪烁 / 误跳转 -->
+  <div
+    v-if="settings.restoring"
+    class="fixed inset-0 z-[60] flex items-center justify-center bg-canvas"
+  >
       <div class="flex flex-col items-center gap-3">
         <img src="/logo.png" alt="YDevSphere" class="h-16 w-auto object-contain" />
-        <span class="text-sm text-gray-500">{{ t("app.restoring") }}</span>
+        <span class="text-sm text-muted">{{ t("app.restoring") }}</span>
       </div>
     </div>
 

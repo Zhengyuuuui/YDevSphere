@@ -10,6 +10,7 @@ pub mod error;
 pub mod git;
 pub mod memory;
 pub mod project;
+pub mod technology;
 pub mod workspace;
 
 pub use editor::{
@@ -21,5 +22,8 @@ pub use memory::{ProjectMemory, ProjectRef};
 pub use project::{
     DetectedProject, DirNode, Project, ProjectDetail, ProjectKind, ScanHistory,
     ScanResult,
+};
+pub use technology::{
+    TechnologiesJson, Technology, TechnologyCategory,
 };
 pub use workspace::{SystemWorkspace, SystemWorkspaceKind};

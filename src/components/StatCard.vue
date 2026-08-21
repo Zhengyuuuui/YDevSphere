@@ -7,9 +7,9 @@ defineProps<{
 
 <template>
   <div class="flex min-w-0 flex-col gap-1">
-    <span class="text-[28px] font-semibold leading-none tracking-tight tabular-nums text-[#17191C]">
+    <span class="text-[28px] font-semibold leading-none tracking-tight tabular-nums text-ink">
       {{ value }}
     </span>
-    <span class="text-[12px] text-[#9CA3AF]">{{ label }}</span>
+    <span class="text-[13px] text-faint">{{ label }}</span>
   </div>
 </template>

@@ -24,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::core::models::{DetectedProject, DirNode, ProjectKind};
+use crate::core::models::{DetectedProject, DirNode, ProjectKind, Technology};
 use crate::core::parser::{self, ProjectMeta};
 
 /// 扫描错误。
@@ -80,6 +80,24 @@ const MANIFEST_FILES: &[&str] = &[
     "requirements.txt",
 ];
 
+/// 候选子项目目录名（Spec §4.1，V0.4）。
+///
+/// 阶段 B（子项目发现）只从这些"known project dirs"触发。
+/// 误报防护（Spec §4.3）：候选目录进入子项目检测前**必须** contains manifest
+/// 或 contains workspace signal；仅目录名是 `app` 不足以判为子项目（`docs/app/` 不误判）。
+const CANDIDATE_DIRS: &[&str] = &[
+    "frontend",
+    "backend",
+    "client",
+    "server",
+    "web",
+    "api",
+    "app",
+    "apps",
+    "packages",
+    "services",
+];
+
 /// 扫描配置（v0.2）。
 #[derive(Debug, Clone)]
 pub struct ScanOptions {
@@ -116,11 +134,16 @@ pub fn scan_workspace(workspace_path: &Path) -> Result<ScanOutput, ScanError> {
 
 /// 扫描指定工作区路径（带配置），返回识别出的项目。
 ///
-/// 语义（`docs/v0.2-scanner-plan.md` §2.1）：对工作区根 R 的**每个直接子目录 D**
-/// 逐一做 4 类判定，根 R 本身不生成卡片。
+/// 语义（`docs/v0.2-scanner-plan.md` §2.1 + V0.4 PR3 两阶段有限递归，Spec §4）：
 ///
-/// 特例兼容：若 R 本身含清单（用户直接选了一个项目目录作工作区），
-/// 则只识别 R 为真项目，不再展开其内部。
+/// - **根无 manifest**：对工作区根 R 的每个直接子目录 D 逐一做 4 类判定
+///   （真项目 / 聚合根 / 分类目录 / 普通目录），根 R 本身不生成卡片。
+/// - **根有 manifest**：两阶段（Spec §4.1 P0-4）
+///   1. 阶段 A：识别根自身技术栈；
+///   2. 阶段 B：独立发现子项目（候选目录 frontend/backend/...，须 contains
+///      manifest 或 workspace signal）。
+///   当子项目 ≥2 时，根升格为**聚合根**，其 `technologies` 为
+///   Union(children.technologies)（derived summary，Spec §2.2）。
 pub fn scan_workspace_with_options(
     workspace_path: &Path,
     options: &ScanOptions,
@@ -132,28 +155,18 @@ pub fn scan_workspace_with_options(
     let mut projects = Vec::new();
     let mut ignored_count = 0usize;
 
-    // 特例：根本身是真项目 → 只识别它，不拆内部。
-    if has_manifest(workspace_path) {
-        let meta = project_meta_if_manifest(workspace_path)?.unwrap_or_else(|| ProjectMeta::new(None, None));
-        let health = health_score(workspace_path, ProjectKind::Real);
-        let name = project_name(workspace_path, &meta);
-        projects.push(DetectedProject::new_with_kind(
-            name,
-            dir_path_string(workspace_path),
-            meta.language,
-            meta.framework,
-            None,
-            ProjectKind::Real,
-            health,
-            None,
-        ));
+    // 根有 manifest 或 Swift 信号 → 两阶段（阶段 A 根自身 + 阶段 B 子项目发现 / 聚合）。
+    // V0.4 Swift 边界修复：含 `.xcodeproj` 的根走两阶段，根识别为 Swift 真项目，
+    // 内部 `.xcodeproj` 不再被当作独立子项目拆出。
+    if has_manifest(workspace_path) || has_swift_signal(workspace_path) {
+        scan_root_with_children(workspace_path, options, &mut projects, &mut ignored_count)?;
         return Ok(ScanOutput {
             projects,
             ignored_count,
         });
     }
 
-    // 遍历根的直接子目录 D，逐一判定（parent = None，即顶层卡片）。
+    // 根无 manifest/Swift → 遍历根的直接子目录 D，逐一判定（parent = None，顶层卡片）。
     let child_dirs = list_child_dirs(workspace_path, options, &mut ignored_count)?;
     for child in &child_dirs {
         classify_dir(child, 0, options, None, &mut projects, &mut ignored_count)?;
@@ -163,6 +176,84 @@ pub fn scan_workspace_with_options(
         projects,
         ignored_count,
     })
+}
+
+/// 两阶段扫描：根含 manifest 时的阶段 A（根自身）+ 阶段 B（候选目录子项目发现）。
+///
+/// - 阶段 A：识别根自身技术栈（`ProjectMeta.technologies`，由 Detection Registry 产出）。
+/// - 阶段 B：仅检查候选目录（Spec §4.1 `CANDIDATE_DIRS`），且每个候选目录**必须**
+///   contains manifest 或 workspace signal 才识别为子项目（Spec §4.3 误报防护）。
+///
+/// 结果判定：
+/// - 子项目数量 ≥2 → 根升格为 `AggregatedRoot`，`technologies` =
+///   Union(children.technologies)（按 canonical id 去重，Spec §2.2）；
+///   子项目 `parent_path = 根`（落库后回填 `parent_id`）。
+/// - 子项目数量 <2 → 根保持 `Real`，不识别候选子项目（维持 v0.2「根有 manifest
+///   不拆内部」行为，如 src/ 等非候选目录不被拆）。
+fn scan_root_with_children(
+    root: &Path,
+    options: &ScanOptions,
+    projects: &mut Vec<DetectedProject>,
+    ignored_count: &mut usize,
+) -> Result<(), ScanError> {
+    // 阶段 A：根自身技术栈。
+    let meta = project_meta_if_manifest(root)?.unwrap_or_else(|| ProjectMeta::new(None, None));
+    let root_path = dir_path_string(root);
+    let root_name = project_name(root, &meta);
+
+    // 阶段 B：候选目录子项目发现。
+    let child_dirs = list_child_dirs(root, options, ignored_count)?;
+    let mut children: Vec<DetectedProject> = Vec::new();
+    for child in &child_dirs {
+        let name = dir_name(child);
+        // §4.1：子项目发现只从候选目录触发。
+        if !CANDIDATE_DIRS.contains(&name.as_str()) {
+            continue;
+        }
+        // §4.3 误报防护：候选目录必须 contains manifest 或 workspace signal。
+        if !has_manifest(child) && !has_workspace_signal(child) {
+            continue;
+        }
+        // 递归识别子项目（child 为真项目 / 聚合根）。
+        let before = projects.len();
+        classify_dir(child, 1, options, Some(&root_path), projects, ignored_count)?;
+        for p in &projects[before..] {
+            children.push(p.clone());
+        }
+    }
+
+    let health = health_score(root, ProjectKind::AggregatedRoot);
+    if children.len() >= 2 {
+        // 聚合根：derived = Union(children.technologies)（Spec §2.2）。
+        let derived = union_technologies(&children);
+        let mut agg = DetectedProject::new_with_kind(
+            root_name,
+            root_path,
+            None,
+            None,
+            None,
+            ProjectKind::AggregatedRoot,
+            health,
+            None,
+        );
+        agg.technologies = derived;
+        projects.push(agg);
+    } else {
+        // 根保持 Real（无子项目），自身技术栈入列。
+        let mut project = DetectedProject::new_with_kind(
+            root_name,
+            root_path,
+            meta.language,
+            meta.framework,
+            None,
+            ProjectKind::Real,
+            health_score(root, ProjectKind::Real),
+            None,
+        );
+        project.technologies = meta.technologies;
+        projects.push(project);
+    }
+    Ok(())
 }
 
 /// 自顶向下递归识别目录 D，并决定其卡片类型。
@@ -189,11 +280,25 @@ fn classify_dir(
         return Ok(());
     }
 
+    // §4.3 误报防护：候选目录名（app/frontend/...）必须 contains manifest 或
+    // workspace signal，否则不作为项目/聚合根（如 `docs/app/` 不误判为子项目）。
+    if CANDIDATE_DIRS.contains(&name.as_str())
+        && !has_manifest(dir)
+        && !has_workspace_signal(dir)
+    {
+        return Ok(());
+    }
+
+    // §4.2 递归深度：第三层（depth >= 2）仅当有 workspace/monorepo 信号才继续深入。
+    if depth >= 2 && !has_workspace_signal(dir) {
+        return Ok(());
+    }
+
     // ① 真项目：含清单文件 → 生成卡片，内部不再拆。
     if let Some(meta) = project_meta_if_manifest(dir)? {
         let health = health_score(dir, ProjectKind::Real);
         let pname = project_name(dir, &meta);
-        projects.push(DetectedProject::new_with_kind(
+        let mut project = DetectedProject::new_with_kind(
             pname,
             dir_path_string(dir),
             meta.language,
@@ -202,7 +307,10 @@ fn classify_dir(
             ProjectKind::Real,
             health,
             parent.map(String::from),
-        ));
+        );
+        // V0.4（PR2）：registry 产出的技术栈随项目传递（落库 technologies_json）。
+        project.technologies = meta.technologies;
+        projects.push(project);
         return Ok(());
     }
 
@@ -210,18 +318,15 @@ fn classify_dir(
     let child_dirs = list_child_dirs(dir, options, ignored_count)?;
 
     // ② 聚合根：无清单，但直接子目录含 ≥2 个真项目/聚合根。
-    // 判定方式：对每个直接子目录，判断其是否为「真项目」或「聚合根」。
-    // 为判定「聚合根」需要递归，但为避免指数级重复遍历，这里用一次轻量探测：
-    // 统计「含清单的直接子目录」数量 + 「直接子目录自身是聚合根」的数量。
-    let mut project_like_children = 0usize;
-    for child in &child_dirs {
-        if is_real_project(child) || is_aggregated_root(child, options) {
-            project_like_children += 1;
-        }
-    }
+    // 判定方式：对每个直接子目录，判断其是否为「项目类」子项
+    // （候选目录名须 contains manifest 或 workspace signal；非候选名须真项目/聚合根）。
+    let project_like_children = child_dirs
+        .iter()
+        .filter(|c| is_project_like(c, options))
+        .count();
 
     if project_like_children >= 2 {
-        // 聚合根：生成一张卡片，子项目作为其 tree 子结构。
+        // 聚合根：先递归收集子项目，再 push 聚合根卡片（带 derived 技术栈）。
         //
         // 「父项目边界优先」落地：子项目**不并列生成卡片**——它们仍入库
         // （带 `parent_path` 归属，落库后回填为 `parent_id`），但 `get_projects`
@@ -229,21 +334,29 @@ fn classify_dir(
         // `parent_id_filter = Some(父id)` 或 `get_dir_children` 按需获取。
         let health = health_score(dir, ProjectKind::AggregatedRoot);
         let parent_path = dir_path_string(dir);
-        projects.push(DetectedProject::new_with_kind(
+
+        // 递归识别子项目（收集以计算 derived 聚合）。
+        let before = projects.len();
+        for child in &child_dirs {
+            classify_dir(child, depth + 1, options, Some(&parent_path), projects, ignored_count)?;
+        }
+        // V0.4（PR3）：聚合根 technologies = Union(children.technologies)（Spec §2.2）。
+        // 修复 v0.3 缺陷：聚合根不再硬编码空技术栈。
+        let children: Vec<DetectedProject> = projects[before..].to_vec();
+        let derived = union_technologies(&children);
+
+        let mut agg = DetectedProject::new_with_kind(
             name.clone(),
-            parent_path.clone(),
+            parent_path,
             None,
             None,
             None,
             ProjectKind::AggregatedRoot,
             health,
             parent.map(String::from),
-        ));
-
-        // 子项目作为聚合根的 tree 子结构：入库（带 parent 归属），后代不再展开。
-        for child in &child_dirs {
-            classify_dir(child, depth + 1, options, Some(&parent_path), projects, ignored_count)?;
-        }
+        );
+        agg.technologies = derived;
+        projects.push(agg);
         return Ok(());
     }
 
@@ -291,9 +404,36 @@ fn has_manifest(dir: &Path) -> bool {
     MANIFEST_FILES.iter().any(|m| dir.join(m).is_file())
 }
 
-/// 判断目录是否为「真项目」（含清单）。
+/// Swift / Xcode 项目信号（V0.4 Swift detector A 边界判定，Spec §5.2）。
+///
+/// 任一信号存在即视为 Swift 真项目：
+/// - `Package.swift`（SPM 清单）
+/// - `.xcodeproj` / `.xcworkspace`（Xcode 工程，目录后缀）
+/// - 含 `.swift` 源文件（递归一层，复用 `parser::swift::has_swift_files`）
+///
+/// 跨平台纯文件存在性判断，无 macOS-only 逻辑。
+fn has_swift_signal(dir: &Path) -> bool {
+    dir.join("Package.swift").is_file()
+        || parser::swift::has_xcodeproj(dir)
+        || parser::swift::has_swift_files(dir)
+}
+
+/// 判断目录是否为「真项目」（含清单 或 Swift 信号，V0.4 Swift 边界修复）。
 fn is_real_project(dir: &Path) -> bool {
-    has_manifest(dir)
+    has_manifest(dir) || has_swift_signal(dir)
+}
+
+/// 判断目录是否为「项目类」子项（用于聚合根计数，V0.4 PR3）。
+///
+/// 误报防护（Spec §4.3）：候选目录名（app/frontend/...）**必须** contains manifest
+/// 或 workspace signal 才计为项目类子项；非候选目录名沿用 v0.2 语义
+/// （真项目 或 聚合根）。
+fn is_project_like(dir: &Path, options: &ScanOptions) -> bool {
+    let name = dir_name(dir);
+    if CANDIDATE_DIRS.contains(&name.as_str()) {
+        return has_manifest(dir) || has_workspace_signal(dir);
+    }
+    is_real_project(dir) || is_aggregated_root(dir, options)
 }
 
 /// 判断目录是否为「聚合根」（无清单，但直接子目录含 ≥2 个真项目/聚合根）。
@@ -308,9 +448,41 @@ fn is_aggregated_root(dir: &Path, options: &ScanOptions) -> bool {
     };
     let count = children
         .iter()
-        .filter(|c| is_real_project(c) || is_aggregated_root(c, options))
+        .filter(|c| is_project_like(c, options))
         .count();
     count >= 2
+}
+
+/// 是否存在 workspace / monorepo 信号（Spec §4.2）：`pnpm-workspace.yaml`
+/// 或 `package.json.workspaces`。
+fn has_workspace_signal(dir: &Path) -> bool {
+    if dir.join("pnpm-workspace.yaml").is_file() {
+        return true;
+    }
+    if let Ok(raw) = std::fs::read_to_string(dir.join("package.json")) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+            if value.get("workspaces").is_some() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// 聚合 derived 技术栈：`Union(projects.technologies)`，按 canonical id 去重
+/// （Spec §2.2，P0-2）。
+fn union_technologies(projects: &[DetectedProject]) -> Vec<Technology> {
+    let mut seen_ids: Vec<String> = Vec::new();
+    let mut out: Vec<Technology> = Vec::new();
+    for project in projects {
+        for tech in &project.technologies {
+            if !seen_ids.contains(&tech.id) {
+                seen_ids.push(tech.id.clone());
+                out.push(tech.clone());
+            }
+        }
+    }
+    out
 }
 
 /// 读取目录的直接子目录列表（排除忽略项；忽略的目录计入 `ignored_count`）。
@@ -340,9 +512,13 @@ fn list_child_dirs(
     Ok(dirs)
 }
 
-/// 判断目录是否含可识别清单文件，若有则返回技术栈元数据。
+/// 判断目录是否含可识别清单文件（含 Swift 信号），若有则返回技术栈元数据。
+///
+/// V0.4 Swift 边界修复：入口判断从 `has_manifest` 扩展为
+/// `has_manifest || has_swift_signal`，确保含 `.xcodeproj`/`.swift` 的 Swift 真项目
+/// 能进入 `parser::detect_stack` 走 Swift detector 解析技术栈。
 fn project_meta_if_manifest(dir: &Path) -> Result<Option<ProjectMeta>, ScanError> {
-    if !has_manifest(dir) {
+    if !has_manifest(dir) && !has_swift_signal(dir) {
         return Ok(None);
     }
     // 用 parser 解析出技术栈；解析失败不影响识别（仍视为项目）。
@@ -1041,5 +1217,103 @@ mod tests {
         let out_custom = scan_workspace_with_options(&root, &options).expect("扫描应成功");
         assert_eq!(out_custom.projects.len(), 1);
         assert!(out_custom.projects[0].path.ends_with("/app"));
+    }
+
+    // ---- V0.4 Swift 边界修复（is_real_project / project_meta_if_manifest 认 Swift 信号）----
+
+    /// 含 `.xcodeproj` 的 Swift 工程被边界判定为真项目，且技术栈含 swift + xcode。
+    #[test]
+    fn xcodeproj_project_detected_with_swift_stack() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!(
+            "ydevsphere_swift_xcode_test_{}_{}",
+            std::process::id(),
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("创建根目录失败");
+
+        // 根下含 .xcodeproj 的 Swift 工程（无 package.json/Cargo.toml 等 MANIFEST_FILES）
+        std::fs::create_dir_all(root.join("MyApp/MyApp.xcodeproj")).unwrap();
+        std::fs::create_dir_all(root.join("MyApp/Sources")).unwrap();
+        std::fs::write(
+            root.join("MyApp/Sources/main.swift"),
+            "import SwiftUI\n",
+        )
+        .unwrap();
+
+        let out = scan_workspace(&root).expect("扫描应成功");
+        let app = out
+            .projects
+            .iter()
+            .find(|p| p.path.ends_with("MyApp"))
+            .expect("含 .xcodeproj 的 Swift 工程应被判为真项目");
+        assert_eq!(app.kind, ProjectKind::Real);
+        assert_eq!(app.language.as_deref(), Some("Swift"));
+        let ids: Vec<&str> = app.technologies.iter().map(|t| t.id.as_str()).collect();
+        assert!(ids.contains(&"swift"), "应有 swift，实际 {ids:?}");
+        assert!(ids.contains(&"xcode"), "应有 xcode，实际 {ids:?}");
+    }
+
+    /// 含 `.swift` 源文件（无 .xcodeproj / Package.swift）目录也被判为真项目。
+    #[test]
+    fn swift_source_dir_detected() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!(
+            "ydevsphere_swift_src_test_{}_{}",
+            std::process::id(),
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("创建根目录失败");
+
+        std::fs::create_dir_all(root.join("cli/Sources")).unwrap();
+        std::fs::write(root.join("cli/Sources/main.swift"), "print(\"hi\")\n").unwrap();
+
+        let out = scan_workspace(&root).expect("扫描应成功");
+        let cli = out
+            .projects
+            .iter()
+            .find(|p| p.path.ends_with("cli"))
+            .expect("含 .swift 源文件的目录应被判为真项目");
+        assert_eq!(cli.kind, ProjectKind::Real);
+        assert_eq!(cli.language.as_deref(), Some("Swift"));
+    }
+
+    /// 纯 Node 目录仍以 package.json 优先（不因 has_swift_signal 误判为 Swift）。
+    #[test]
+    fn node_project_not_swift_regression() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
+        let root = std::env::temp_dir().join(format!(
+            "ydevsphere_swift_node_reg_test_{}_{}",
+            std::process::id(),
+            n
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("创建根目录失败");
+
+        std::fs::create_dir_all(root.join("web")).unwrap();
+        std::fs::write(
+            root.join("web/package.json"),
+            r#"{"name":"web","dependencies":{"express":"^4.0.0"}}"#,
+        )
+        .unwrap();
+        std::fs::write(root.join("web/server.js"), "const express = require('express')\n").unwrap();
+
+        let out = scan_workspace(&root).expect("扫描应成功");
+        let web = out
+            .projects
+            .iter()
+            .find(|p| p.path.ends_with("web"))
+            .expect("Node 工程应被识别");
+        assert_eq!(web.language.as_deref(), Some("Node"), "package.json 应优先于 Swift 信号");
+        let ids: Vec<&str> = web.technologies.iter().map(|t| t.id.as_str()).collect();
+        assert!(!ids.contains(&"swift"), "Node 工程不应误判为 Swift");
     }
 }

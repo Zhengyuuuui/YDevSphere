@@ -32,25 +32,25 @@ const recent = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-full bg-[#F7F8FA]">
+  <div class="min-h-full bg-canvas">
     <div class="mx-auto max-w-[1140px] px-8 py-7">
       <div class="mb-5">
-        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-[#17191C]">
+        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-ink">
           {{ t("recent.title") }}
         </h1>
-        <p class="mt-1 text-[13px] text-[#9CA3AF]">{{ t("recent.subtitle") }}</p>
+        <p class="mt-1 text-[14px] text-faint">{{ t("recent.subtitle") }}</p>
       </div>
 
       <div v-if="recent.length > 0" class="mb-2 px-1">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">
+        <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">
           {{ t("recent.recentlyOpened") }}
         </span>
       </div>
 
-      <div class="rounded-[8px] border border-[#E5E7EB] bg-white">
+      <div class="rounded-[8px] border border-divider bg-surface">
         <div v-if="recent.length === 0" class="py-20 text-center">
-          <p class="mb-1.5 text-[15px] font-semibold text-[#17191C]">{{ t("recent.empty") }}</p>
-          <p class="text-[13px] text-[#9CA3AF]">{{ t("recent.emptyHint") }}</p>
+          <p class="mb-1.5 text-[15px] font-semibold text-ink">{{ t("recent.empty") }}</p>
+          <p class="text-[14px] text-faint">{{ t("recent.emptyHint") }}</p>
         </div>
         <ProjectTable v-else :projects="recent" :show-last-opened="true" />
       </div>

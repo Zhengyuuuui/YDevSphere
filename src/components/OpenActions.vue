@@ -64,7 +64,7 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
   <div ref="menuEl" class="relative inline-flex items-center" @click.stop>
     <!-- 打开（默认编辑器 / 文件管理器）按钮 -->
     <button
-      class="inline-flex items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+      class="inline-flex items-center gap-1 rounded border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-surface-2 disabled:opacity-60"
       :disabled="editorStore.opening?.projectId === projectId"
       :title="defaultEditorName ?? t('detail.openFileManager')"
       @click="handleDefaultOpen"
@@ -74,7 +74,7 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
 
     <!-- 下拉箭头 -->
     <button
-      class="ml-1 rounded border border-gray-300 bg-white px-1 py-1 text-xs text-gray-600 hover:bg-gray-100"
+      class="ml-1 rounded border border-line bg-surface px-1 py-1 text-xs text-muted hover:bg-surface-2"
       :title="t('table.more')"
       @click="toggleMenu"
     >
@@ -84,25 +84,25 @@ onUnmounted(() => document.removeEventListener("click", onDocClick));
     <!-- 下拉菜单 -->
     <div
       v-if="menuOpen"
-      class="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      class="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-lg border border-line-3 bg-surface py-1 shadow-lg"
       @click.stop
     >
       <button
-        class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+        class="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-surface-3"
         @click="handleFileManager"
       >
         {{ t("table.openFileManager") }}
       </button>
-      <div v-if="openableEditors.length" class="my-1 border-t border-gray-100"></div>
+      <div v-if="openableEditors.length" class="my-1 border-t border-line-2"></div>
       <button
         v-for="ed in openableEditors"
         :key="ed.id"
-        class="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+        class="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-surface-3"
         @click="handleOpenWith(ed.id)"
       >
         {{ t("table.openIn", { name: ed.name }) }}
       </button>
-      <div v-if="!openableEditors.length" class="px-3 py-2 text-xs text-gray-400">
+      <div v-if="!openableEditors.length" class="px-3 py-2 text-xs text-faint">
         {{ t("table.noEditor") }}
       </div>
     </div>

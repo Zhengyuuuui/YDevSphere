@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import ProjectTable from "@/components/ProjectTable.vue";
 import EnableMemoryDialog from "@/components/EnableMemoryDialog.vue";
@@ -19,6 +19,7 @@ import type { WorkspaceFilter, ProjectSortBy } from "@/api/project";
 import type { SystemWorkspaceKind } from "@/types";
 
 const router = useRouter();
+const route = useRoute();
 const { t } = useI18n();
 const projectStore = useProjectStore();
 const settings = useSettingsStore();
@@ -168,6 +169,17 @@ async function selectWorkspace(filter: WorkspaceFilter) {
   await projectStore.fetchProjects(sortMode.value, filter);
 }
 
+/** 由路由 query 的 workspace 参数应用工作区筛选（侧边栏工作区项进入用） */
+async function applyWorkspaceFromQuery() {
+  const q = route.query.workspace;
+  const filter: WorkspaceFilter =
+    q === "documents" || q === "desktop" ? q : "all";
+  if (workspaceFilter.value === filter) return;
+  workspaceFilter.value = filter;
+  resetTree();
+  await projectStore.fetchProjects(sortMode.value, filter);
+}
+
 async function selectSort(sort: ProjectSortBy) {
   sortOpen.value = false;
   if (sortMode.value === sort) return;
@@ -258,8 +270,16 @@ async function handleScan(target: "all" | "documents" | "desktop" = "all") {
 }
 
 onMounted(() => {
-  projectStore.fetchProjects(sortMode.value, workspaceFilter.value);
+  applyWorkspaceFromQuery();
 });
+
+/** 侧边栏工作区项点击（带 query）时，同步应用对应分类筛选 */
+watch(
+  () => route.query.workspace,
+  () => {
+    applyWorkspaceFromQuery();
+  }
+);
 
 /** 首次扫描成功且有项目时，弹出「启用项目记忆」询问 */
 watch(
@@ -273,7 +293,7 @@ watch(
 </script>
 
 <template>
-  <div class="min-h-full bg-[#F7F8FA]">
+  <div class="min-h-full bg-canvas">
     <div class="mx-auto max-w-[1140px] px-8 py-7">
       <!-- 页头（small 下扫描按钮允许换行） -->
       <div
@@ -281,41 +301,41 @@ watch(
         :class="layout.appMode === 'small' ? 'flex-wrap gap-3' : ''"
       >
         <div>
-          <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-[#17191C]">
+          <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-ink">
             {{ t("projects.title") }}
           </h1>
           <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
             <!-- 工作区下拉 -->
             <div class="relative">
               <button
-                class="flex items-center gap-1 text-[13px] text-[#6B7280] transition-colors hover:text-[#374151]"
+                class="flex items-center gap-1 text-[14px] text-muted transition-colors hover:text-ink"
                 @click="toggleWorkspace"
               >
                 {{ currentFilterLabel }}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#B0B7C3]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-fainter">
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </button>
               <div
                 v-if="workspaceOpen"
-                class="absolute left-0 top-full z-50 mt-2 w-[220px] rounded-[8px] border border-[#E5E7EB] bg-white py-1"
+                class="absolute left-0 top-full z-50 mt-2 w-[220px] rounded-[8px] border border-line-3 bg-surface py-1"
                 style="box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
               >
                 <div class="px-3 py-1.5">
-                  <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">
+                  <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">
                     {{ t("nav.workspace") }}
                   </span>
                 </div>
                 <button
                   v-for="opt in filterOptions"
                   :key="opt.value"
-                  class="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-[#F9FAFB]"
+                  class="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-surface-3"
                   @click="selectWorkspace(opt.value)"
                 >
-                  <span class="text-[13px] text-[#17191C]">{{ opt.label }}</span>
+                  <span class="text-[14px] text-ink">{{ opt.label }}</span>
                   <svg
                     v-if="workspaceFilter === opt.value"
-                    width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
                     class="ml-2 shrink-0"
                   >
                     <path d="M20 6 9 17l-5-5" />
@@ -323,26 +343,26 @@ watch(
                 </button>
               </div>
             </div>
-            <span class="text-[13px] leading-none text-[#D1D5DB]">·</span>
-            <span class="text-[13px] text-[#9CA3AF]">{{ t("projects.count", { count: projectStore.projects.length }) }}</span>
+            <span class="text-[14px] leading-none text-fainter">·</span>
+            <span class="text-[14px] text-faint">{{ t("projects.count", { count: projectStore.projects.length }) }}</span>
           </div>
         </div>
 
         <!-- 扫描按钮：主按钮扫全部 + 下箭头下拉（只扫 Documents/Desktop） -->
         <div class="relative mt-1 shrink-0">
           <div
-            class="flex overflow-hidden rounded-[7px] border border-[#E5E7EB] bg-white shadow-sm transition-colors hover:bg-[#F9FAFB] disabled:cursor-not-allowed disabled:opacity-50"
+            class="flex overflow-hidden rounded-[7px] border border-line bg-surface shadow-sm transition-colors hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
             :class="scanner.status === 'scanning' ? 'pointer-events-none opacity-50' : ''"
           >
             <!-- 主按钮：扫全部 -->
             <button
-              class="flex items-center gap-1.5 py-[7px] pl-3 pr-2.5 text-[13px] text-[#374151] transition-colors hover:bg-[#F9FAFB]"
+              class="flex items-center gap-1.5 py-[7px] pl-3 pr-2.5 text-[14px] text-ink transition-colors hover:bg-surface-3"
               :disabled="scanner.status === 'scanning'"
               @click="handleScan('all')"
             >
               <svg
                 width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                class="text-[#9CA3AF]"
+                class="text-faint"
                 :class="scanner.status === 'scanning' ? 'animate-spin' : ''"
               >
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" />
@@ -351,11 +371,11 @@ watch(
               {{ scanButtonLabel }}
             </button>
             <!-- 分隔线 -->
-            <span class="my-[7px] w-px bg-[#E5E7EB]" />
+            <span class="my-[7px] w-px bg-line" />
             <!-- 下箭头：展开下拉 -->
             <button
-              class="flex items-center px-2 text-[#9CA3AF] transition-colors hover:bg-[#F3F4F6] hover:text-[#6B7280]"
-              :class="scanMenuOpen ? 'bg-[#F3F4F6] text-[#6B7280]' : ''"
+              class="flex items-center px-2 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+              :class="scanMenuOpen ? 'bg-surface-2 text-muted' : ''"
               :disabled="scanner.status === 'scanning'"
               :title="t('scan.range')"
               @click.stop="toggleScanMenu"
@@ -371,25 +391,25 @@ watch(
           <!-- 下拉菜单 -->
           <div
             v-if="scanMenuOpen"
-            class="absolute right-0 top-full z-50 mt-1.5 w-[180px] rounded-[8px] border border-[#E5E7EB] bg-white py-1"
+            class="absolute right-0 top-full z-50 mt-1.5 w-[180px] rounded-[8px] border border-line-3 bg-surface py-1"
             style="box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
             @click.stop
           >
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleScan('all')"
             >
               {{ t("scan.scanAll") }}
             </button>
-            <div class="my-1 border-t border-[#F3F4F6]" />
+            <div class="my-1 border-t border-line-2" />
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleScan('documents')"
             >
               {{ t("scan.scanDocuments") }}
             </button>
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleScan('desktop')"
             >
               {{ t("scan.scanDesktop") }}
@@ -400,22 +420,22 @@ watch(
 
       <!-- 扫描状态条 -->
       <div v-if="scanner.status === 'scanning'" class="mb-4">
-        <div class="flex items-center gap-3 rounded-[8px] border border-[#E5E7EB] bg-white px-4 py-2.5 text-[13px]">
-          <span class="h-[7px] w-[7px] shrink-0 animate-pulse rounded-full bg-[#2563EB]" />
-          <span class="font-medium text-[#17191C]">{{ t("scan.scanningStatus") }}</span>
-          <span class="text-[#9CA3AF]">{{ t("scan.pleaseWait") }}</span>
+        <div class="flex items-center gap-3 rounded-[8px] border border-line-3 bg-surface px-4 py-2.5 text-[14px]">
+          <span class="h-[7px] w-[7px] shrink-0 animate-pulse rounded-full bg-primary" />
+          <span class="font-medium text-ink">{{ t("scan.scanningStatus") }}</span>
+          <span class="text-faint">{{ t("scan.pleaseWait") }}</span>
         </div>
       </div>
       <div v-else-if="scanner.status === 'done' && scanSummary" class="mb-4">
-        <div class="flex items-center gap-3 rounded-[8px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-2.5 text-[13px]">
+        <div class="flex items-center gap-3 rounded-[8px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-2.5 text-[14px] dark:border-green-900 dark:bg-green-950">
           <span class="h-[7px] w-[7px] shrink-0 rounded-full bg-[#16A34A]" />
-          <span class="font-medium text-[#15803D]">{{ scanSummary }}</span>
+          <span class="font-medium text-[#15803D] dark:text-green-400">{{ scanSummary }}</span>
         </div>
       </div>
       <div v-else-if="scanner.status === 'error'" class="mb-4">
-        <div class="flex items-center gap-3 rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-2.5 text-[13px]">
+        <div class="flex items-center gap-3 rounded-[8px] border border-[#FECACA] bg-[#FEF2F2] px-4 py-2.5 text-[14px] dark:border-red-900 dark:bg-red-950">
           <span class="h-[7px] w-[7px] shrink-0 rounded-full bg-[#DC2626]" />
-          <span class="font-medium text-[#B91C1C]">{{ scanner.error }}</span>
+          <span class="font-medium text-[#B91C1C] dark:text-red-400">{{ scanner.error }}</span>
         </div>
       </div>
 
@@ -428,7 +448,7 @@ watch(
         <div class="relative" :class="layout.appMode === 'small' ? 'w-full max-w-[340px]' : ''">
           <svg
             width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#B0B7C3]"
+            class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fainter"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
@@ -437,11 +457,11 @@ watch(
             v-model="keyword"
             type="text"
             :placeholder="t('projects.searchPlaceholder')"
-            class="h-[36px] w-full rounded-[8px] border border-[#E5E7EB] bg-white pl-8 pr-8 text-[13px] text-[#17191C] placeholder:text-[#B0B7C3] focus:border-[#2563EB] focus:outline-none"
+            class="h-[36px] w-full rounded-[8px] border border-line bg-surface pl-8 pr-8 text-[14px] text-ink placeholder:text-fainter focus:border-primary focus:outline-none"
           />
           <button
             v-if="keyword"
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#B0B7C3] transition-colors hover:text-[#6B7280]"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-fainter transition-colors hover:text-muted"
             @click="keyword = ''"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -454,36 +474,36 @@ watch(
         <!-- 排序下拉 -->
         <div class="relative shrink-0">
           <button
-            class="flex h-[32px] items-center gap-1.5 rounded-[6px] px-3 text-[13px] transition-colors"
+            class="flex h-[32px] items-center gap-1.5 rounded-[6px] px-3 text-[14px] transition-colors"
             :class="
               sortOpen
-                ? 'border border-[#E5E7EB] bg-white text-[#17191C] shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
-                : 'text-[#6B7280] hover:bg-[#F3F4F6] hover:text-[#374151]'
+                ? 'border border-line bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+                : 'text-muted hover:bg-surface-2 hover:text-ink'
             "
             @click="toggleSort"
           >
             {{ t("projects.sortBy") }}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#B0B7C3]">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-fainter">
               <path d="M6 9l6 6 6-6" />
             </svg>
           </button>
           <div
             v-if="sortOpen"
-            class="absolute right-0 top-full z-50 mt-1 w-[180px] rounded-[8px] border border-[#E5E7EB] bg-white py-1"
+            class="absolute right-0 top-full z-50 mt-1 w-[180px] rounded-[8px] border border-line-3 bg-surface py-1"
             style="box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
           >
             <button
               v-for="opt in sortOptions"
               :key="opt.value"
-              class="flex w-full items-center justify-between px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-[#F9FAFB]"
+              class="flex w-full items-center justify-between px-3 py-1.5 text-left text-[14px] transition-colors hover:bg-surface-3"
               @click="selectSort(opt.value)"
             >
-              <span :class="sortMode === opt.value ? 'font-medium text-[#2563EB]' : 'text-[#374151]'">
+              <span :class="sortMode === opt.value ? 'font-medium text-primary' : 'text-ink'">
                 {{ opt.label }}
               </span>
               <svg
                 v-if="sortMode === opt.value"
-                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
               >
                 <path d="M20 6 9 17l-5-5" />
               </svg>
@@ -494,35 +514,35 @@ watch(
 
       <!-- 区块标签 -->
       <div v-if="views.length > 0" class="mb-2 px-1">
-        <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">
+        <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">
           {{ sectionLabel }}
         </span>
       </div>
 
       <!-- 表格 -->
-      <div class="rounded-[8px] border border-[#E5E7EB] bg-white">
+      <div class="rounded-[8px] border border-divider bg-surface">
         <!-- 加载中 -->
-        <div v-if="projectStore.listLoading" class="py-20 text-center text-[13px] text-[#9CA3AF]">
+        <div v-if="projectStore.listLoading" class="py-20 text-center text-[14px] text-faint">
           {{ t("projects.loading") }}
         </div>
         <!-- 错误 -->
         <div
           v-else-if="projectStore.error && projectStore.projects.length === 0"
-          class="py-20 text-center text-[13px] text-[#DC2626]"
+          class="py-20 text-center text-[14px] text-red-600 dark:text-red-400"
         >
           {{ projectStore.error }}
         </div>
         <!-- 无项目 -->
         <div v-else-if="projectStore.projects.length === 0" class="py-20 text-center">
-          <p class="mb-1.5 text-[15px] font-semibold text-[#17191C]">{{ t("projects.empty") }}</p>
-          <p class="text-[13px] text-[#9CA3AF]">{{ t("projects.emptyHint") }}</p>
+          <p class="mb-1.5 text-[15px] font-semibold text-ink">{{ t("projects.empty") }}</p>
+          <p class="text-[14px] text-faint">{{ t("projects.emptyHint") }}</p>
         </div>
         <!-- 搜索无结果 -->
         <div v-else-if="views.length === 0" class="py-20 text-center">
-          <p class="mb-1.5 text-[15px] font-semibold text-[#17191C]">{{ t("projects.noMatch") }}</p>
-          <p class="mb-5 text-[13px] text-[#9CA3AF]">{{ t("projects.noMatchHint") }}</p>
+          <p class="mb-1.5 text-[15px] font-semibold text-ink">{{ t("projects.noMatch") }}</p>
+          <p class="mb-5 text-[14px] text-faint">{{ t("projects.noMatchHint") }}</p>
           <button
-            class="rounded-[6px] border border-[#E5E7EB] px-3 py-1.5 text-[13px] text-[#6B7280] transition-colors hover:bg-[#F3F4F6]"
+            class="rounded-[6px] border border-line px-3 py-1.5 text-[14px] text-muted transition-colors hover:bg-surface-2"
             @click="keyword = ''"
           >
             {{ t("projects.clearSearch") }}

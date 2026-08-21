@@ -178,8 +178,22 @@ function calculateBrightnessField(x: number, y: number, timeOffset: number): num
   return (combined + 1) / 2;
 }
 
-/** 颜色：本项目为浅色调，用低对比浅灰点阵 */
+/**
+ * 颜色：浅色主题用低对比浅灰点阵；dark 主题用比背景略亮的暗蓝灰点阵，
+ * 让云团在黑色背景上保持低调、不刺眼。
+ */
+const isDark = () =>
+  typeof document !== "undefined" && document.documentElement.dataset.theme === "dark";
+
 function getColor(opacity: number): string {
+  if (isDark()) {
+    if (opacity < 0.15) return "rgba(60, 68, 78, 0.45)";
+    if (opacity < 0.35) return "rgba(74, 83, 94, 0.6)";
+    if (opacity < 0.55) return "rgba(90, 100, 112, 0.72)";
+    if (opacity < 0.75) return "rgba(108, 118, 131, 0.82)";
+    if (opacity < 0.9) return "rgba(124, 134, 147, 0.9)";
+    return "rgba(140, 150, 163, 0.97)";
+  }
   if (opacity < 0.15) return "rgba(180, 186, 194, 0.40)";
   if (opacity < 0.35) return "rgba(160, 168, 178, 0.55)";
   if (opacity < 0.55) return "rgba(140, 149, 160, 0.68)";

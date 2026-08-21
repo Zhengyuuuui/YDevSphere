@@ -217,14 +217,14 @@ function defaultEditorName(): string | null {
   <div class="w-full">
     <!-- 表头 -->
     <div
-      class="grid items-center border-b border-[#E5E7EB] px-4 py-2.5"
+      class="grid items-center border-b border-divider px-4 py-2.5"
       :style="{ gridTemplateColumns: GRID }"
     >
-      <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">{{ t("table.project") }}</span>
-      <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">{{ t("table.techStack") }}</span>
-      <span v-if="showGit" class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">{{ t("table.git") }}</span>
-      <span class="text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">{{ t("table.health") }}</span>
-      <span v-if="showTime" class="text-right text-[10px] font-semibold uppercase tracking-[0.09em] text-[#B0B7C3]">{{ timeLabel }}</span>
+      <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">{{ t("table.project") }}</span>
+      <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">{{ t("table.techStack") }}</span>
+      <span v-if="showGit" class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">{{ t("table.git") }}</span>
+      <span class="font-display text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">{{ t("table.health") }}</span>
+      <span v-if="showTime" class="font-display text-right text-[10px] font-semibold uppercase tracking-[0.09em] text-fainter">{{ timeLabel }}</span>
       <span></span>
     </div>
 
@@ -233,16 +233,16 @@ function defaultEditorName(): string | null {
       v-for="(row, index) in rows"
       :key="row.view.id"
       class="relative grid cursor-pointer items-center border-b px-4 transition-colors duration-75"
-      :class="index === rows.length - 1 ? 'border-transparent' : 'border-[#EAECEF]'"
+      :class="index === rows.length - 1 ? 'border-transparent' : 'border-divider'"
       :style="{
         gridTemplateColumns: GRID,
         minHeight: '68px',
         backgroundColor:
           selectedId === row.view.id
-            ? '#F0F4FF'
+            ? 'var(--color-primary-soft)'
             : hoveredId === row.view.id || openMenuId === row.view.id
-            ? '#FAFAFA'
-            : '#FFFFFF',
+            ? 'var(--color-surface-3)'
+            : 'var(--color-surface)',
         borderRadius:
           index === 0 && index === rows.length - 1
             ? '7px'
@@ -267,7 +267,7 @@ function defaultEditorName(): string | null {
         >
           <button
             v-if="canExpand?.(row.view)"
-            class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] text-[#9CA3AF] transition-colors hover:bg-[#EAECEF] hover:text-[#6B7280]"
+            class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-muted"
             :title="isExpanded?.(row.view.id) ? t('table.collapse') : t('table.expand')"
             @click.stop="emit('toggle-expand', row.view)"
           >
@@ -290,7 +290,7 @@ function defaultEditorName(): string | null {
           <span v-else class="h-[18px] w-[18px] shrink-0" />
         </div>
 
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="shrink-0 text-[#C4C9D0]">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="shrink-0 text-fainter">
           <path
             d="M2 5C2 4.17 2.67 3.5 3.5 3.5H6L7.5 5H12.5C13.33 5 14 5.67 14 6.5V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V5Z"
             stroke="currentColor"
@@ -300,10 +300,10 @@ function defaultEditorName(): string | null {
         </svg>
         <div class="min-w-0">
           <div
-            class="flex items-center gap-1.5 text-[14px] font-medium leading-tight"
-            :class="selectedId === row.view.id ? 'text-[#1D4ED8]' : 'text-[#17191C]'"
+            class="flex items-center gap-1.5 text-[15px] font-medium leading-tight"
+            :class="selectedId === row.view.id ? 'text-active' : 'text-ink'"
           >
-            <span class="truncate">{{ row.view.name }}</span>
+            <span class="font-display truncate">{{ row.view.name }}</span>
             <span
               v-if="KIND_META[row.view.kind].label"
               class="inline-flex shrink-0 items-center rounded-[4px] px-[5px] py-[1px] text-[10px] font-medium leading-[14px]"
@@ -312,13 +312,13 @@ function defaultEditorName(): string | null {
               {{ KIND_META[row.view.kind].label }}
             </span>
           </div>
-          <div class="mt-[3px] truncate text-[12px] text-[#9CA3AF]">{{ row.view.path }}</div>
+          <div class="mt-[3px] truncate text-[13px] text-faint">{{ row.view.path }}</div>
         </div>
       </div>
 
-      <!-- 技术栈徽标（单行，固定可见数，超出显示 +N） -->
-      <div class="flex min-w-0 items-center gap-1 overflow-hidden pr-4">
-        <span v-if="row.view.technologies.length === 0" class="text-[12px] text-[#9CA3AF]">
+      <!-- 技术栈徽标（固定可见数，超出显示 +N；空间不足时换行避免徽标被切半） -->
+      <div class="flex min-w-0 flex-wrap items-center gap-1 overflow-hidden pr-4">
+        <span v-if="row.view.technologies.length === 0" class="text-[13px] text-faint">
           {{ t("table.unknown") }}
         </span>
         <template v-else>
@@ -330,7 +330,7 @@ function defaultEditorName(): string | null {
           />
           <span
             v-if="hiddenTechCount(row.view) > 0"
-            class="inline-flex shrink-0 items-center rounded-[4px] bg-[#F3F4F6] px-[7px] py-[2px] text-[11px] font-medium leading-[18px] text-[#9CA3AF]"
+            class="inline-flex shrink-0 items-center rounded-[4px] bg-surface-2 px-[7px] py-[2px] text-[11px] font-medium leading-[18px] text-faint"
           >
             {{ t("table.moreTech", { count: hiddenTechCount(row.view) }) }}
           </span>
@@ -345,13 +345,13 @@ function defaultEditorName(): string | null {
       <!-- 健康度 -->
       <div class="pr-4">
         <div class="flex items-center gap-1.5">
-          <div class="h-[5px] w-[44px] overflow-hidden rounded-full bg-[#F3F4F6]">
+          <div class="h-[5px] w-[44px] overflow-hidden rounded-full bg-surface-2">
             <div
               class="h-full rounded-full"
               :style="{ width: `${Math.min(100, Math.max(0, row.view.healthScore))}%`, backgroundColor: healthTone(row.view.healthScore).color }"
             />
           </div>
-          <span class="text-[12px] tabular-nums" :style="{ color: healthTone(row.view.healthScore).color }">
+          <span class="text-[13px] tabular-nums" :style="{ color: healthTone(row.view.healthScore).color }">
             {{ row.view.healthScore }}
           </span>
         </div>
@@ -359,7 +359,7 @@ function defaultEditorName(): string | null {
 
       <!-- 时间（仅 large 显示） -->
       <div v-if="showTime" class="text-right">
-        <span class="text-[12px] text-[#9CA3AF]">{{ timeValue(row.view) }}</span>
+        <span class="text-[13px] text-faint">{{ timeValue(row.view) }}</span>
       </div>
 
       <!-- 行操作 -->
@@ -371,7 +371,7 @@ function defaultEditorName(): string | null {
         <template v-if="!isSmall">
           <template v-if="hoveredId === row.view.id || openMenuId === row.view.id">
             <button
-              class="rounded-[5px] p-1.5 text-[#9CA3AF] transition-colors hover:bg-[#EAECEF] hover:text-[#6B7280]"
+              class="rounded-[5px] p-1.5 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
               :title="t('table.openWith', { name: defaultEditorName() ?? t('table.defaultEditor') })"
               @click.stop="handleOpen(row.view)"
             >
@@ -382,8 +382,8 @@ function defaultEditorName(): string | null {
               </svg>
             </button>
             <button
-              class="rounded-[5px] p-1.5 text-[#9CA3AF] transition-colors hover:bg-[#EAECEF] hover:text-[#6B7280]"
-              :class="openMenuId === row.view.id ? 'bg-[#EAECEF] text-[#6B7280]' : ''"
+              class="rounded-[5px] p-1.5 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+              :class="openMenuId === row.view.id ? 'bg-surface-2 text-muted' : ''"
               :title="t('table.more')"
               @click.stop="toggleMenu(row.view.id)"
             >
@@ -397,40 +397,40 @@ function defaultEditorName(): string | null {
             <!-- 下拉菜单 -->
             <div
               v-if="openMenuId === row.view.id"
-              class="absolute right-0 top-full z-50 mt-1 w-[196px] rounded-[8px] border border-[#E5E7EB] bg-white py-1"
+              class="absolute right-0 top-full z-50 mt-1 w-[196px] rounded-[8px] border border-line-3 bg-surface py-1"
               style="box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
               @click.stop
             >
               <button
-                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
                 @click="goDetail(row.view)"
               >
                 {{ t("table.viewDetail") }}
               </button>
-              <div class="my-1 border-t border-[#F3F4F6]" />
+              <div class="my-1 border-t border-line-2" />
               <button
                 v-for="ed in openableEditors"
                 :key="ed.id"
-                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
                 @click="handleOpenWith(row.view, ed.id)"
               >
                 {{ t("table.openIn", { name: ed.name }) }}
               </button>
               <button
-                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
                 @click="handleFileManager(row.view)"
               >
                 {{ t("table.openFileManager") }}
               </button>
               <button
-                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
                 @click="handleOpenTerminal(row.view)"
               >
                 {{ t("table.openTerminal") }}
               </button>
-              <div class="my-1 border-t border-[#F3F4F6]" />
+              <div class="my-1 border-t border-line-2" />
               <button
-                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+                class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
                 @click="handleCopyPath(row.view)"
               >
                 {{ t("table.copyPath") }}
@@ -442,8 +442,8 @@ function defaultEditorName(): string | null {
         <!-- small：始终可见 More(⋯) 按钮（菜单含 Open / Open in Editor / reveal / Copy Path / Details） -->
         <template v-else>
           <button
-            class="rounded-[5px] p-1.5 text-[#9CA3AF] transition-colors hover:bg-[#EAECEF] hover:text-[#6B7280]"
-            :class="openMenuId === row.view.id ? 'bg-[#EAECEF] text-[#6B7280]' : ''"
+            class="rounded-[5px] p-1.5 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+            :class="openMenuId === row.view.id ? 'bg-surface-2 text-muted' : ''"
             :title="t('table.more')"
             @click.stop="toggleMenu(row.view.id)"
           >
@@ -456,12 +456,12 @@ function defaultEditorName(): string | null {
 
           <div
             v-if="openMenuId === row.view.id"
-            class="absolute right-0 top-full z-50 mt-1 w-[196px] rounded-[8px] border border-[#E5E7EB] bg-white py-1"
+            class="absolute right-0 top-full z-50 mt-1 w-[196px] rounded-[8px] border border-line bg-surface py-1"
             style="box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)"
             @click.stop
           >
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleOpen(row.view)"
             >
               {{ t("table.open") }}
@@ -469,27 +469,27 @@ function defaultEditorName(): string | null {
             <button
               v-for="ed in openableEditors"
               :key="ed.id"
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleOpenWith(row.view, ed.id)"
             >
               {{ t("table.openIn", { name: ed.name }) }}
             </button>
-            <div class="my-1 border-t border-[#F3F4F6]" />
+            <div class="my-1 border-t border-line-2" />
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleFileManager(row.view)"
             >
               {{ revealLabel }}
             </button>
-            <div class="my-1 border-t border-[#F3F4F6]" />
+            <div class="my-1 border-t border-line-2" />
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="handleCopyPath(row.view)"
             >
               {{ t("table.copyPath") }}
             </button>
             <button
-              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] text-[#374151] transition-colors duration-75 hover:bg-[#F9FAFB]"
+              class="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[14px] text-ink transition-colors duration-75 hover:bg-surface-3"
               @click="goDetail(row.view)"
             >
               {{ t("table.viewDetail") }}

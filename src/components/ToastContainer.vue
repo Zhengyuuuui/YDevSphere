@@ -2,9 +2,9 @@
 import { toastState, remove } from "@/lib/toast";
 
 const tone = (type: string) => {
-  if (type === "success") return "border-green-200 bg-green-50 text-green-800";
-  if (type === "error") return "border-red-200 bg-red-50 text-red-800";
-  return "border-gray-200 bg-white text-gray-800";
+  if (type === "success") return "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-300";
+  if (type === "error") return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300";
+  return "border-line bg-surface text-ink";
 };
 </script>
 

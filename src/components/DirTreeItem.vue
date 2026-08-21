@@ -32,11 +32,15 @@ function isExpandable(node: DirNode): boolean {
 <template>
   <div>
     <!-- 当前节点行 -->
-    <div class="flex items-center gap-1.5 rounded-[5px] px-1.5 py-1 transition-colors hover:bg-[#F3F4F6]">
+    <div
+      class="flex items-center gap-1.5 rounded-[5px] px-1.5 py-1 transition-colors hover:bg-surface-2"
+      :class="isExpandable(node) ? 'cursor-pointer' : ''"
+      @click="isExpandable(node) && emit('toggle', node)"
+    >
       <button
         v-if="isExpandable(node)"
-        class="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-[3px] text-[#9CA3AF] hover:bg-[#EAECEF] hover:text-[#6B7280]"
-        @click="emit('toggle', node)"
+        class="flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-[3px] text-faint hover:bg-surface-2 hover:text-muted"
+        @click.stop="emit('toggle', node)"
       >
         <svg
           v-if="loading.has(node.path)"
@@ -78,7 +82,7 @@ function isExpandable(node: DirNode): boolean {
         />
       </svg>
 
-      <span class="min-w-0 truncate text-[13px] text-[#374151]">{{ node.name }}</span>
+      <span class="min-w-0 truncate text-[14px] text-ink">{{ node.name }}</span>
 
       <!-- 真项目根标记 -->
       <span

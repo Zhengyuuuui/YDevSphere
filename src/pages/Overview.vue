@@ -94,54 +94,54 @@ function goDetail(id: number) {
 </script>
 
 <template>
-  <div class="min-h-full bg-[#F7F8FA]">
+  <div class="min-h-full bg-canvas">
     <div class="mx-auto max-w-[1060px] px-8 py-8">
       <!-- Greeting -->
       <div class="mb-7">
-        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-[#17191C]">
+        <h1 class="text-[22px] font-semibold leading-tight tracking-tight text-ink">
           {{ greeting() }}
         </h1>
-        <p class="mt-1 text-[13px] text-[#9CA3AF]">
+        <p class="mt-1 text-[14px] text-faint">
           {{ t("overview.subtitle") }}
         </p>
       </div>
 
       <!-- 统计行 -->
-      <div class="mb-7 flex items-center gap-8 border-b border-[#EAEDF0] pb-7">
+      <div class="mb-7 flex items-center gap-8 border-b border-line-3 pb-7">
         <StatCard :value="totalProjects" :label="t('overview.statProjects')" />
-        <div class="h-8 w-px bg-[#EAEDF0]" />
+        <div class="h-8 w-px bg-line-3" />
         <StatCard :value="repoCount" :label="t('overview.statRepos')" />
-        <div class="h-8 w-px bg-[#EAEDF0]" />
+        <div class="h-8 w-px bg-line-3" />
         <StatCard :value="cleanCount" :label="t('overview.statClean')" />
       </div>
 
       <!-- 两列：活动图 + 技术栈分布 -->
       <div class="mb-5 grid grid-cols-[1fr_260px] gap-5">
         <!-- 活动图（mock） -->
-        <div class="rounded-[10px] border border-[#EAEDF0] bg-white p-5">
+        <div class="rounded-[10px] border border-line-3 bg-surface p-5">
           <div class="mb-4 flex items-center justify-between">
-            <span class="text-[13px] font-semibold text-[#17191C]">{{ t("overview.activity") }}</span>
-            <span class="text-[12px] text-[#9CA3AF]">{{ t("overview.activitySub") }}</span>
+            <span class="font-display text-[15px] font-semibold text-ink">{{ t("overview.activity") }}</span>
+            <span class="text-[13px] text-faint">{{ t("overview.activitySub") }}</span>
           </div>
           <ActivityChart />
         </div>
 
         <!-- 技术栈分布（真实数据） -->
-        <div class="rounded-[10px] border border-[#EAEDF0] bg-white p-5">
-          <span class="mb-4 block text-[13px] font-semibold text-[#17191C]">{{ t("overview.techStack") }}</span>
+        <div class="rounded-[10px] border border-line-3 bg-surface p-5">
+          <span class="font-display mb-4 block text-[15px] font-semibold text-ink">{{ t("overview.techStack") }}</span>
           <TechStackList :items="techStack" />
-          <p class="mt-3 text-[11px] text-[#B0B7C3]">
+          <p class="mt-3 text-[11px] text-fainter">
             {{ t("overview.techStackNote") }}
           </p>
         </div>
       </div>
 
       <!-- 最近项目 -->
-      <div class="rounded-[10px] border border-[#EAEDF0] bg-white">
-        <div class="flex items-center justify-between border-b border-[#F3F4F6] px-5 py-4">
-          <span class="text-[13px] font-semibold text-[#17191C]">{{ t("overview.recentProjects") }}</span>
+      <div class="rounded-[10px] border border-line-3 bg-surface">
+        <div class="flex items-center justify-between border-b border-line-2 px-5 py-4">
+          <span class="font-display text-[15px] font-semibold text-ink">{{ t("overview.recentProjects") }}</span>
           <button
-            class="flex items-center gap-1 text-[12px] text-[#6B7280] transition-colors hover:text-[#2563EB]"
+            class="flex items-center gap-1 text-[13px] text-muted transition-colors hover:text-primary"
             @click="goProjects"
           >
             {{ t("overview.viewAll") }}
@@ -152,22 +152,22 @@ function goDetail(id: number) {
           </button>
         </div>
 
-        <div class="divide-y divide-[#F3F4F6]">
+        <div class="divide-y divide-line-2">
           <div
             v-for="r in recentProjects"
             :key="r.id"
-            class="flex cursor-pointer items-center justify-between px-5 py-3 transition-colors hover:bg-[#FAFAFA]"
+            class="flex cursor-pointer items-center justify-between px-5 py-3 transition-colors hover:bg-surface-3"
             @click="goDetail(r.id)"
           >
             <div class="flex flex-col gap-0.5">
-              <span class="text-[13px] font-medium text-[#17191C]">{{ r.name }}</span>
-              <span class="text-[11px] text-[#9CA3AF]">{{ r.tech || t("card.noTech") }}</span>
+              <span class="text-[14px] font-medium text-ink">{{ r.name }}</span>
+              <span class="text-[11px] text-faint">{{ r.tech || t("card.noTech") }}</span>
             </div>
-            <span class="shrink-0 text-[12px] tabular-nums text-[#B0B7C3]">{{ r.timeAgo }}</span>
+            <span class="shrink-0 text-[13px] tabular-nums text-fainter">{{ r.timeAgo }}</span>
           </div>
           <div
             v-if="recentProjects.length === 0"
-            class="px-5 py-8 text-center text-[13px] text-[#9CA3AF]"
+            class="px-5 py-8 text-center text-[14px] text-faint"
           >
             {{ t("overview.noRecent") }}
           </div>

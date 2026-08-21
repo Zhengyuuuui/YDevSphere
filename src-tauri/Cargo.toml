@@ -45,6 +45,10 @@ objc2 = "0.6"
 objc2-foundation = "0.3"
 objc2-app-kit = "0.3"
 
+[dev-dependencies]
+# 集成测试（tests/）需直接创建内存数据库进行「落库/读回」断言。
+rusqlite = { version = "0.32", features = ["bundled"] }
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if
