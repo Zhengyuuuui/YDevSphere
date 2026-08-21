@@ -33,3 +33,12 @@ src-tauri/gen
 # 项目文档目录（仅根目录，忽略新文件；已追踪的历史文件不受影响）
 /doc/
 /docs/
+
+# 授权系统（私有资产，严禁推送公开仓库；已跟踪文件由 pre-commit/pre-push hook 拦截）
+/src-tauri/src/core/license/
+/src-tauri/src/commands/license.rs
+/src/api/license.ts
+/src/stores/license.ts
+/src/types/license.ts
+/docs/V04-LICENSE-PROTOCOL.md
+/docs/V04B-*
